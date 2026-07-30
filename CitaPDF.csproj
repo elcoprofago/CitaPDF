@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- Habilita System.Windows.Forms.FolderBrowserDialog (WPF no tiene
+         selector de carpetas nativo) para "Examinar carpeta". -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>CitaPDF</AssemblyName>
+    <RootNamespace>CitaPDF</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ver CONSULTOR-ACADEMICO-GUI.csproj: UseWindowsForms + UseWPF generan
+         global usings ambiguos entre System.Windows y System.Windows.Forms
+         para tipos con el mismo nombre corto (Application, Button, TextBox,
+         Brush, etc.). -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="PdfPig" Version="0.1.14" />
+  </ItemGroup>
+
+</Project>
