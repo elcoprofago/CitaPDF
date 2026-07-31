@@ -26,16 +26,28 @@
             <TextBlock x:Name="TxtContador" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="Gray"/>
         </Grid>
 
-        <DataGrid x:Name="GridBiblioteca" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+        <DataGrid x:Name="GridBiblioteca" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="False"
                   SelectionMode="Single" SelectionUnit="FullRow" CanUserSortColumns="True"
-                  MouseDoubleClick="GridBiblioteca_MouseDoubleClick">
+                  ClipboardCopyMode="ExcludeHeader"
+                  MouseDoubleClick="GridBiblioteca_MouseDoubleClick"
+                  CellEditEnding="GridBiblioteca_CellEditEnding"
+                  PreviewMouseRightButtonDown="GridBiblioteca_PreviewMouseRightButtonDown"
+                  ToolTip="Los campos se editan haciendo clic y luego F2 (o escribiendo directamente); doble clic abre el detalle de la cita. Clic derecho para copiar o borrar.">
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copiar cita APA" Click="MenuCopiarCita_Click"/>
+                    <MenuItem Header="Copiar fila completa" Click="MenuCopiarFila_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Borrar registro" Click="MenuBorrarRegistro_Click"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Título" Binding="{Binding Titulo}" Width="3*"/>
-                <DataGridTextColumn Header="Autores" Binding="{Binding AutoresTexto}" Width="2*"/>
+                <DataGridTextColumn Header="Autores" Binding="{Binding AutoresTexto}" SortMemberPath="AutoresTexto" Width="2*"/>
                 <DataGridTextColumn Header="Año" Binding="{Binding Anio}" Width="70"/>
                 <DataGridTextColumn Header="Editorial" Binding="{Binding Editorial}" Width="2*"/>
-                <DataGridTextColumn Header="Adquirido" Binding="{Binding FechaTexto}" Width="120"/>
-                <DataGridTextColumn Header="Estado" Binding="{Binding Estado}" Width="140"/>
+                <DataGridTextColumn Header="Adquirido" Binding="{Binding FechaTexto}" Width="110" IsReadOnly="True"/>
+                <DataGridTextColumn Header="URL" Binding="{Binding Url}" Width="2*"/>
             </DataGrid.Columns>
         </DataGrid>
 

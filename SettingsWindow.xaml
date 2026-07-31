@@ -4,10 +4,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Configuración" Height="220" Width="480" WindowStartupLocation="CenterOwner"
+        Title="Configuración" Height="340" Width="480" WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
     <Grid Margin="14">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -26,7 +27,25 @@
             <TextBox x:Name="TxtCarpetaDatos" Margin="0,4,0,0" IsReadOnly="True" Background="#FFF0F0F0"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+        <StackPanel Grid.Row="2" Margin="0,16,0,0">
+            <TextBlock Text="Tema:" FontWeight="Bold"/>
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <RadioButton x:Name="RbTemaClaro" Content="Claro" GroupName="Tema"
+                             Checked="Tema_Changed" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                <RadioButton x:Name="RbTemaOscuro" Content="Oscuro" GroupName="Tema"
+                             Checked="Tema_Changed" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                <RadioButton x:Name="RbTemaTextura" Content="Textura" GroupName="Tema"
+                             Checked="Tema_Changed" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <TextBox x:Name="TxtRutaTextura" Width="300" IsReadOnly="True"
+                         Background="#FFF0F0F0" VerticalContentAlignment="Center"/>
+                <Button x:Name="BtnExaminarTextura" Content="Examinar..." Padding="10,4" Margin="8,0,0,0"
+                        Click="BtnExaminarTextura_Click"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button x:Name="BtnGuardar" Content="Guardar" Padding="10,6" Click="BtnGuardar_Click" IsDefault="True"/>
             <Button x:Name="BtnCancelar" Content="Cancelar" Padding="10,6" Margin="8,0,0,0" Click="BtnCancelar_Click" IsCancel="True"/>
         </StackPanel>

@@ -27,4 +27,8 @@
     <PackageReference Include="PdfPig" Version="0.1.14" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="assets\rueda.png" />
+  </ItemGroup>
+
 </Project>

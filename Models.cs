@@ -38,5 +38,12 @@ namespace CitaPDF
         // la biblioteca completa -- "al menos las últimas 3" del pedido
         // original, configurable desde SettingsWindow.
         public int FilasVisiblesEnGrid { get; set; } = 15;
+
+        // "Claro" | "Oscuro" | "Textura" -- misma lógica que CONSULTOR-GUI.
+        // Default "Claro" porque es el aspecto que ya tenía la ventana antes
+        // de que existiera este ajuste (ningún usuario existente ve un
+        // cambio de golpe al actualizar).
+        public string Tema { get; set; } = "Claro";
+        public string? RutaTextura { get; set; }
     }
 }

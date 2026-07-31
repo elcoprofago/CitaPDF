@@ -1,21 +1,55 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using CitaPDF.Servicios;
 
 namespace CitaPDF
 {
+    // Envuelve un DocumentoRecord con propiedades de lectura/escritura --
+    // el grid de biblioteca permite editar cualquier columna (los enlaces de
+    // descarga en particular cambian con el tiempo), así que a diferencia de
+    // DocumentoRow (MainWindow, sólo lectura) acá los setters escriben
+    // directo sobre el registro subyacente.
     public class BibliotecaRow
     {
         public DocumentoRecord Documento { get; }
         public BibliotecaRow(DocumentoRecord documento) => Documento = documento;
 
-        public string Titulo => Documento.Titulo;
-        public string Anio => Documento.Anio;
-        public string Editorial => Documento.Editorial;
-        public string AutoresTexto => string.Join("; ", Documento.AutoresApa);
+        public string Titulo
+        {
+            get => Documento.Titulo;
+            set => Documento.Titulo = value?.Trim() ?? "";
+        }
+
+        public string AutoresTexto
+        {
+            get => string.Join("; ", Documento.AutoresApa ?? new List<string>());
+            set => Documento.AutoresApa = (value ?? "")
+                .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(a => a.Trim())
+                .Where(a => a.Length > 0)
+                .ToList();
+        }
+
+        public string Anio
+        {
+            get => Documento.Anio;
+            set => Documento.Anio = value?.Trim() ?? "";
+        }
+
+        public string Editorial
+        {
+            get => Documento.Editorial;
+            set => Documento.Editorial = value?.Trim() ?? "";
+        }
+
         public string FechaTexto => Documento.FechaAdquisicion.ToString("yyyy-MM-dd");
-        public string Estado => Documento.ExtraidoAutomaticamente
-            ? "Guardado"
-            : "Guardado (revisar datos)";
+
+        public string Url
+        {
+            get => Documento.OrigenUrl ?? "";
+            set => Documento.OrigenUrl = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
     }
 
     public partial class BibliotecaWindow : Window
@@ -64,6 +98,72 @@ namespace CitaPDF
                 new CitacionWindow(fila.Documento) { Owner = this }.ShowDialog();
                 _todos = Biblioteca.CargarDocumentos();
                 AplicarFiltro();
+            }
+        }
+
+        private void GridBiblioteca_CellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction != System.Windows.Controls.DataGridEditAction.Commit) return;
+            if (e.Row.Item is not BibliotecaRow fila) return;
+
+            bool esUrl = e.Column.Header?.ToString() == "URL";
+
+            // CellEditEnding se dispara antes de que el binding empuje el
+            // valor editado al origen -- se pospone al final del ciclo del
+            // Dispatcher para que Documento ya tenga el dato nuevo.
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                // El año/título/autor/editorial sí se consideran parte de la
+                // extracción automática; la URL es metadata aparte que suele
+                // completarse después, así que no debe marcar la cita como
+                // "para revisar".
+                if (!esUrl) fila.Documento.ExtraidoAutomaticamente = false;
+
+                fila.Documento.CitaApa = CitaApa.Construir(
+                    fila.Documento.AutoresApa, fila.Documento.Anio, fila.Documento.Titulo,
+                    fila.Documento.Editorial, fila.Documento.OrigenUrl);
+
+                Biblioteca.GuardarDocumentos(_todos);
+            }));
+        }
+
+        // El clic derecho no mueve la selección por defecto en un DataGrid
+        // -- sin esto, "Borrar registro" podría borrar una fila distinta de
+        // la que el usuario clickeó.
+        private void GridBiblioteca_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var dep = (DependencyObject)e.OriginalSource;
+            while (dep != null && dep is not DataGridRow)
+                dep = VisualTreeHelper.GetParent(dep);
+            if (dep is DataGridRow row) row.IsSelected = true;
+        }
+
+        private void MenuBorrarRegistro_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridBiblioteca.SelectedItem is not BibliotecaRow fila) return;
+
+            var confirmar = MessageBox.Show(this,
+                $"¿Borrar definitivamente el registro {fila.Documento.DocumentoId} ({fila.Titulo})?\n\nEsta acción no se puede deshacer.",
+                "Borrar registro", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirmar != MessageBoxResult.Yes) return;
+
+            _todos.RemoveAll(d => d.DocumentoId == fila.Documento.DocumentoId);
+            Biblioteca.GuardarDocumentos(_todos);
+            AplicarFiltro();
+        }
+
+        private void MenuCopiarCita_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridBiblioteca.SelectedItem is BibliotecaRow fila && !string.IsNullOrWhiteSpace(fila.Documento.CitaApa))
+                Clipboard.SetText(fila.Documento.CitaApa);
+        }
+
+        private void MenuCopiarFila_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridBiblioteca.SelectedItem is BibliotecaRow fila)
+            {
+                string linea = string.Join("\t", fila.Titulo, fila.AutoresTexto, fila.Anio, fila.Editorial, fila.Url);
+                Clipboard.SetText(linea);
             }
         }
 

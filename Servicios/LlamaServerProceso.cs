@@ -93,10 +93,16 @@ namespace CitaPDF.Servicios
             return await EsperarSaludAsync(log);
         }
 
+        // Spinner estilo consola (mismo set de caracteres que PostOCRNormalizer)
+        // -- acá se anima con el propio polling de /health cada 1s en vez de
+        // un DispatcherTimer aparte, ya que el ciclo ya existe.
+        private static readonly string[] SpinnerFrames = { "/", "-", "\\", "|" };
+
         private static async Task<bool> EsperarSaludAsync(Action<string, string, bool>? log)
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
             var limite = DateTime.UtcNow.AddSeconds(120);
+            int frame = 0;
 
             while (DateTime.UtcNow < limite)
             {
@@ -109,6 +115,8 @@ namespace CitaPDF.Servicios
                         : $"llama-server se cerró inesperadamente durante el arranque: {detalle}", "ERROR", false);
                     return false;
                 }
+
+                log?.Invoke($"Iniciando modelo local (puerto {Puerto})... {SpinnerFrames[frame++ % SpinnerFrames.Length]}", "SPINNER", true);
 
                 try
                 {

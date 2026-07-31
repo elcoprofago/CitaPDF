@@ -5,70 +5,165 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CitaPDF"
         mc:Ignorable="d"
-        Title="CitaPDF — Citas APA automáticas" Height="640" Width="1000"
-        MinHeight="480" MinWidth="760"
+        Title="Catalogador APA" Height="700" Width="1000"
+        MinHeight="540" MinWidth="760"
         AllowDrop="True" Drop="Window_Drop" DragOver="Window_DragOver"
         Closing="Window_Closing">
+    <Window.Resources>
+        <Style x:Key="BtnIniciarServerStyle" TargetType="Button">
+            <Setter Property="Background" Value="#FFE8A165"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE8600C"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="BtnPurgarStyle" TargetType="Button">
+            <Setter Property="Padding" Value="10,6"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE53935"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="180"/>
+            <RowDefinition x:Name="RowLog" Height="180"/>
         </Grid.RowDefinitions>
 
-        <!-- Barra de adquisición -->
+        <!-- Barra de botones -->
         <Grid Grid.Row="0" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <StackPanel Orientation="Horizontal" Grid.Column="0">
+            <WrapPanel Orientation="Horizontal" Grid.Column="0">
                 <Button x:Name="BtnAgregarArchivos" Content="Agregar archivo(s)..." Padding="10,6"
                         Click="BtnAgregarArchivos_Click"/>
                 <Button x:Name="BtnAgregarCarpeta" Content="Agregar carpeta..." Padding="10,6" Margin="8,0,0,0"
                         Click="BtnAgregarCarpeta_Click"/>
                 <CheckBox x:Name="ChkSubcarpetas" Content="Incluir subcarpetas" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                <TextBox x:Name="TxtUrl" Width="280" Margin="16,0,0,0" VerticalContentAlignment="Center"
-                         ToolTip="URL(s) de descarga directa de un PDF, separadas por ';' si son varias"/>
-                <Button x:Name="BtnAgregarUrl" Content="Agregar por URL" Padding="10,6" Margin="8,0,0,0"
-                        Click="BtnAgregarUrl_Click"/>
-            </StackPanel>
-            <Button x:Name="BtnConfiguracion" Grid.Column="1" Content="⚙ Configuración" Padding="10,6"
-                    Click="BtnConfiguracion_Click"/>
+                <Button x:Name="BtnIniciarLlama" Content="Iniciar server" Margin="20,0,0,0"
+                        Style="{StaticResource BtnIniciarServerStyle}"
+                        Click="BtnIniciarLlama_Click"/>
+                <Button x:Name="BtnPurgar" Content="Purgar procesos huérfanos" Margin="8,0,0,0"
+                        Style="{StaticResource BtnPurgarStyle}"
+                        Click="BtnPurgar_Click"
+                        ToolTip="Mata (con todo su árbol de procesos) cualquier llama-server que haya quedado corriendo de una instancia anterior de CitaPDF"/>
+                <TextBlock x:Name="TxtEstadoServidor" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Bold"/>
+            </WrapPanel>
+            <Button x:Name="BtnConfiguracion" Grid.Column="1" Width="52" Height="52" Padding="4"
+                    HorizontalAlignment="Right" Margin="10,0,0,0"
+                    Background="Transparent" BorderThickness="0"
+                    Click="BtnConfiguracion_Click" ToolTip="Configuración">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <Image x:Name="ImgConfiguracion" Stretch="Uniform"/>
+            </Button>
+        </Grid>
+
+        <!-- Zona de arrastre -->
+        <Grid Grid.Row="1" Height="70" Margin="0,0,0,8">
+            <Rectangle Stroke="#66FFFFFF"
+                       StrokeThickness="2"
+                       StrokeDashArray="4 4"
+                       RadiusX="8"
+                       RadiusY="8"
+                       Fill="#333333"/>
+            <TextBlock Text="Arrastrá uno o varios PDFs acá"
+                       Foreground="White"
+                       FontSize="16"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"/>
+        </Grid>
+
+        <!-- Adquisición por URL: fila propia, campo largo, un solo botón -->
+        <Grid Grid.Row="2" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="URL del PDF:" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
+            <TextBox x:Name="TxtUrl" Grid.Column="1" VerticalContentAlignment="Center"
+                     ToolTip="URL(s) de descarga directa de un PDF, separadas por ';' si son varias"/>
+            <Button x:Name="BtnAgregarUrl" Grid.Column="2" Content="Agregar" Padding="14,6" Margin="8,0,0,0"
+                    Click="BtnAgregarUrl_Click"/>
         </Grid>
 
         <!-- Info / vaciar -->
-        <Grid Grid.Row="1" Margin="0,0,0,6">
+        <Grid Grid.Row="3" Margin="0,0,0,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="TxtEstadoVacio" Grid.Column="0"
-                       Text="Todavía no se catalogó ningún documento. Soltá uno o varios PDFs acá, o usá los botones de arriba."
+                       Text="Todavía no se catalogó ningún documento. Soltá uno o varios PDFs arriba, o usá los botones de arriba."
                        Foreground="Gray" FontStyle="Italic" VerticalAlignment="Center"/>
             <Button x:Name="BtnVerBiblioteca" Grid.Column="1" Content="Ver biblioteca completa"
                     Padding="10,6" Click="BtnVerBiblioteca_Click"/>
         </Grid>
 
         <!-- Grid principal: historial reciente, funciona como biblioteca -->
-        <DataGrid x:Name="GridDocumentos" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
+        <DataGrid x:Name="GridDocumentos" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True"
+                  Background="White" Foreground="Black"
                   SelectionMode="Single" SelectionUnit="FullRow"
-                  MouseDoubleClick="GridDocumentos_MouseDoubleClick">
+                  MouseDoubleClick="GridDocumentos_MouseDoubleClick"
+                  PreviewMouseRightButtonDown="GridDocumentos_PreviewMouseRightButtonDown">
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Borrar registro" Click="MenuBorrarRegistro_Click"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Título" Binding="{Binding Titulo}" Width="3*"/>
-                <DataGridTextColumn Header="Autores" Binding="{Binding AutoresTexto}" Width="2*"/>
+                <DataGridTextColumn Header="Autores" Binding="{Binding AutoresTexto}" SortMemberPath="AutoresTexto" Width="2*"/>
                 <DataGridTextColumn Header="Año" Binding="{Binding Anio}" Width="70"/>
                 <DataGridTextColumn Header="Editorial" Binding="{Binding Editorial}" Width="2*"/>
                 <DataGridTextColumn Header="Estado" Binding="{Binding Estado}" Width="140"/>
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- Log -->
-        <RichTextBox x:Name="TxtLog" Grid.Row="3" Margin="0,8,0,0"
-                     Background="#FF1E1E1E" Foreground="White"
-                     BorderThickness="0" IsReadOnly="True"
-                     FontFamily="Consolas" FontSize="12"
-                     VerticalScrollBarVisibility="Auto"/>
+        <!-- Log: encabezado colapsable (mismo patrón que PostOCRNormalizer) -->
+        <DockPanel Grid.Row="5" Margin="0,8,0,0" LastChildFill="True">
+            <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,4">
+                <Button x:Name="BtnToggleLog" DockPanel.Dock="Left" Content="▼" Width="22" Height="20"
+                        Click="BtnToggleLog_Click" ToolTip="Minimizar/restaurar panel de log"/>
+                <TextBlock DockPanel.Dock="Left" Text="Log del proceso" FontWeight="Bold"
+                           VerticalAlignment="Center" Margin="6,0,0,0"/>
+                <TextBlock x:Name="TxtLegend" DockPanel.Dock="Right" Text="© R.A. Sistemas"
+                           FontSize="11" VerticalAlignment="Center"/>
+            </DockPanel>
+            <Grid x:Name="PanelProgreso" DockPanel.Dock="Top" Margin="0,0,0,4" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ProgressBar x:Name="BarraProgreso" Grid.Column="0" Height="16" Minimum="0" Maximum="100"
+                             Foreground="#FF0080FF"/>
+                <TextBlock x:Name="TxtProgreso" Grid.Column="1" Margin="8,0,0,0"
+                           VerticalAlignment="Center" FontSize="11"/>
+            </Grid>
+            <RichTextBox x:Name="TxtLog"
+                         Background="#FF1E1E1E" Foreground="White"
+                         BorderThickness="0" IsReadOnly="True"
+                         FontFamily="Consolas" FontSize="12"
+                         VerticalScrollBarVisibility="Auto"/>
+        </DockPanel>
     </Grid>
 </Window>

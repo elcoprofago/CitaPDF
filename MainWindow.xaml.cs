@@ -1,8 +1,11 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using CitaPDF.Servicios;
 using Microsoft.Win32;
 
@@ -19,7 +22,7 @@ namespace CitaPDF
         public string Titulo => Documento.Titulo;
         public string Anio => Documento.Anio;
         public string Editorial => Documento.Editorial;
-        public string AutoresTexto => string.Join("; ", Documento.AutoresApa);
+        public string AutoresTexto => string.Join("; ", Documento.AutoresApa ?? new List<string>());
         public string Estado => Documento.ExtraidoAutomaticamente
             ? "Guardado"
             : "Guardado (revisar datos)";
@@ -31,14 +34,149 @@ namespace CitaPDF
         private List<DocumentoRecord> _documentos = new();
         private readonly bool _autoScrollLog = true;
 
+        // Spinner estilo consola (mismo patrón que PostOCRNormalizer) para
+        // los pasos del pipeline que pueden demorar: descarga/lectura del
+        // PDF, extracción de texto y consulta al modelo local.
+        private static readonly string[] SpinnerFrames = { "/", "-", "\\", "|" };
+        private DispatcherTimer? _spinnerTimer;
+        private int _spinnerFrame;
+
+        // Segundos promedio por documento (carga/descarga + extracción de
+        // texto + consulta al modelo local), usado sólo para el mensaje de
+        // "tiempo estimado" del lote -- es una heurística, no una medición.
+        private const int SegundosEstimadosPorDocumento = 90;
+
+        private GridLength? _alturaLogGuardada;
+
         public MainWindow()
         {
             InitializeComponent();
             _settings = Biblioteca.CargarSettings();
             _documentos = Biblioteca.CargarDocumentos();
             ActualizarGrid();
+            CargarIconoConfiguracion();
+            ActualizarEstadoServidor();
+            AplicarTema();
             LlamaServerProceso.PurgarHuerfanos();
             Log("CitaPDF listo.", "OK");
+        }
+
+        // ===================== Tema (misma lógica que CONSULTOR-GUI) =====================
+
+        private void AplicarTema()
+        {
+            switch (_settings.Tema)
+            {
+                case "Oscuro":
+                    Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+                    Foreground = Brushes.White;
+                    break;
+                case "Textura":
+                    Brush? fondoMosaico = null;
+                    if (!string.IsNullOrEmpty(_settings.RutaTextura) && File.Exists(_settings.RutaTextura))
+                    {
+                        try
+                        {
+                            var bmp = new BitmapImage(new Uri(_settings.RutaTextura));
+                            fondoMosaico = new ImageBrush(bmp)
+                            {
+                                TileMode = TileMode.Tile,
+                                Viewport = new Rect(0, 0, bmp.Width, bmp.Height),
+                                ViewportUnits = BrushMappingMode.Absolute
+                            };
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"No se pudo cargar la imagen de textura: {ex.Message}", "WARN");
+                        }
+                    }
+                    fondoMosaico ??= new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+                    Background = fondoMosaico;
+                    Foreground = Brushes.White;
+                    break;
+                default: // "Claro"
+                    Background = new SolidColorBrush(Color.FromRgb(0xEC, 0xEC, 0xEC));
+                    Foreground = Brushes.Black;
+                    break;
+            }
+
+            // La leyenda vive sobre el fondo de ventana (no sobre el log,
+            // que siempre es oscuro) -- sigue el mismo criterio claro/oscuro.
+            TxtLegend.Foreground = _settings.Tema == "Claro" ? Brushes.Black : Brushes.White;
+        }
+
+        // ===================== Panel de log colapsable =====================
+
+        private void BtnToggleLog_Click(object sender, RoutedEventArgs e)
+        {
+            bool colapsar = TxtLog.Visibility == Visibility.Visible;
+            if (colapsar)
+            {
+                _alturaLogGuardada = RowLog.Height;
+                TxtLog.Visibility = Visibility.Collapsed;
+                RowLog.Height = GridLength.Auto;
+                BtnToggleLog.Content = "▶";
+            }
+            else
+            {
+                TxtLog.Visibility = Visibility.Visible;
+                RowLog.Height = _alturaLogGuardada ?? new GridLength(180);
+                BtnToggleLog.Content = "▼";
+            }
+        }
+
+        private void IniciarSpinner(string mensajeBase)
+        {
+            _spinnerTimer?.Stop();
+            _spinnerFrame = 0;
+            _spinnerTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+            _spinnerTimer.Tick += (s, e) =>
+            {
+                _spinnerFrame = (_spinnerFrame + 1) % SpinnerFrames.Length;
+                Log($"{mensajeBase} {SpinnerFrames[_spinnerFrame]}", "SPINNER", overwrite: true);
+            };
+            _spinnerTimer.Start();
+        }
+
+        private void DetenerSpinner()
+        {
+            _spinnerTimer?.Stop();
+            _spinnerTimer = null;
+        }
+
+        // ===================== Configuración / llama-server =====================
+
+        private void CargarIconoConfiguracion()
+        {
+            ImgConfiguracion.Source = new BitmapImage(new Uri("pack://application:,,,/assets/rueda.png"));
+        }
+
+        private void ActualizarEstadoServidor()
+        {
+            bool corriendo = LlamaServerProceso.EstaCorriendo;
+            TxtEstadoServidor.Text = corriendo ? "● Modelo local: corriendo" : "● Modelo local: detenido";
+            TxtEstadoServidor.Foreground = corriendo ? Brushes.LightGreen : Brushes.Gray;
+            BtnIniciarLlama.IsEnabled = !corriendo;
+        }
+
+        private async void BtnIniciarLlama_Click(object sender, RoutedEventArgs e)
+        {
+            BtnIniciarLlama.IsEnabled = false;
+            bool listo = await LlamaServerProceso.AsegurarIniciadoAsync((msg, nivel, overwrite) => Log(msg, nivel, overwrite));
+            ActualizarEstadoServidor();
+            if (!listo) Log("No se pudo iniciar el modelo local.", "ERROR");
+        }
+
+        private void BtnPurgar_Click(object sender, RoutedEventArgs e)
+        {
+            LlamaServerProceso.PurgarHuerfanos();
+            ActualizarEstadoServidor();
+            Log("Purga de procesos huérfanos completada.", "OK");
+            // La propia instancia nunca se purga (PurgarHuerfanos la excluye
+            // por PID), pero vale avisar que sigue corriendo para que no se
+            // confunda con un huérfano que debería haber desaparecido.
+            if (LlamaServerProceso.EstaCorriendo)
+                Log("Servidor funcionando.", "WARN");
         }
 
         // ===================== Grid principal =====================
@@ -55,8 +193,22 @@ namespace CitaPDF
             TxtEstadoVacio.Visibility = _documentos.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        // Mientras hay un lote en proceso, el catálogo no debe editarse --
+        // la ventana de biblioteca y la de detalle de cita escriben directo
+        // sobre biblioteca.json, y podrían pisar lo que el lote está
+        // guardando en paralelo.
+        private bool AvisarSiIndexando()
+        {
+            if (!_procesando) return false;
+            MessageBox.Show(this,
+                "Indexación en curso: esperá a que termine el proceso por lotes antes de editar el catálogo.",
+                "Indexación en curso", MessageBoxButton.OK, MessageBoxImage.Information);
+            return true;
+        }
+
         private void GridDocumentos_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            if (AvisarSiIndexando()) return;
             if (GridDocumentos.SelectedItem is DocumentoRow fila)
             {
                 new CitacionWindow(fila.Documento) { Owner = this }.ShowDialog();
@@ -65,6 +217,33 @@ namespace CitaPDF
                 _documentos = Biblioteca.CargarDocumentos();
                 ActualizarGrid();
             }
+        }
+
+        // El clic derecho no mueve la selección por defecto en un DataGrid
+        // -- sin esto, "Borrar registro" podría borrar una fila distinta de
+        // la que el usuario clickeó.
+        private void GridDocumentos_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var dep = (DependencyObject)e.OriginalSource;
+            while (dep != null && dep is not DataGridRow)
+                dep = VisualTreeHelper.GetParent(dep);
+            if (dep is DataGridRow row) row.IsSelected = true;
+        }
+
+        private void MenuBorrarRegistro_Click(object sender, RoutedEventArgs e)
+        {
+            if (AvisarSiIndexando()) return;
+            if (GridDocumentos.SelectedItem is not DocumentoRow fila) return;
+
+            var confirmar = MessageBox.Show(this,
+                $"¿Borrar definitivamente el registro {fila.Documento.DocumentoId} ({fila.Titulo})?\n\nEsta acción no se puede deshacer.",
+                "Borrar registro", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirmar != MessageBoxResult.Yes) return;
+
+            _documentos.RemoveAll(d => d.DocumentoId == fila.Documento.DocumentoId);
+            Biblioteca.GuardarDocumentos(_documentos);
+            ActualizarGrid();
+            Log($"{fila.Documento.DocumentoId} borrado del catálogo.", "WARN");
         }
 
         // ===================== Adquisición =====================
@@ -164,11 +343,25 @@ namespace CitaPDF
             BtnAgregarCarpeta.IsEnabled = false;
             BtnAgregarUrl.IsEnabled = false;
 
+            int total = items.Count;
+            int minutosEstimados = Math.Max(1, (int)Math.Round(total * SegundosEstimadosPorDocumento / 60.0));
+            Log($"Procesando {total} documento(s) — tiempo estimado: {minutosEstimados} minuto(s).", "INFO");
+            BarraProgreso.Value = 0;
+            TxtProgreso.Text = $"0 / {total} (0%)";
+            PanelProgreso.Visibility = Visibility.Visible;
+
             var agregados = new List<DocumentoRecord>();
             try
             {
+                int procesados = 0;
                 foreach (var item in items)
+                {
                     await ProcesarUnoAsync(item.RutaLocal, item.Url, agregados);
+                    procesados++;
+                    int pct = (int)Math.Round(100.0 * procesados / total);
+                    BarraProgreso.Value = pct;
+                    TxtProgreso.Text = $"{procesados} / {total} ({pct}%)";
+                }
             }
             finally
             {
@@ -176,6 +369,7 @@ namespace CitaPDF
                 BtnAgregarArchivos.IsEnabled = true;
                 BtnAgregarCarpeta.IsEnabled = true;
                 BtnAgregarUrl.IsEnabled = true;
+                PanelProgreso.Visibility = Visibility.Collapsed;
             }
 
             // Si se procesó un único archivo, se muestra directamente la
@@ -198,20 +392,22 @@ namespace CitaPDF
             {
                 if (rutaLocal != null)
                 {
-                    Log($"Validando {etiqueta}...", "INFO");
+                    IniciarSpinner($"Cargando {etiqueta}...");
                     bytes = await File.ReadAllBytesAsync(rutaLocal);
                 }
                 else
                 {
-                    Log($"Descargando {etiqueta}...", "SPINNER");
+                    IniciarSpinner($"Descargando {etiqueta}...");
                     bytes = await PdfValidacion.DescargarAsync(url!);
                 }
             }
             catch (Exception ex)
             {
+                DetenerSpinner();
                 Log($"No se pudo obtener {etiqueta}: {ex.Message}", "ERROR");
                 return;
             }
+            DetenerSpinner();
 
             if (!PdfValidacion.EsPdfValido(bytes))
             {
@@ -234,15 +430,21 @@ namespace CitaPDF
             }
 
             string texto;
+            IniciarSpinner($"Extrayendo texto de {etiqueta}...");
             try
             {
-                Log($"Extrayendo texto de {etiqueta}...", "INFO", overwrite: true);
-                texto = PdfTexto.ExtraerPrimerasPaginas(bytes);
+                // PdfPig es sincrónico/CPU-bound -- se corre en Task.Run para
+                // no bloquear el hilo de UI y dejar que el spinner anime.
+                texto = await Task.Run(() => PdfTexto.ExtraerPrimerasPaginas(bytes));
             }
             catch (Exception ex)
             {
                 Log($"No se pudo leer el contenido de {etiqueta}: {ex.Message}", "WARN");
                 texto = "";
+            }
+            finally
+            {
+                DetenerSpinner();
             }
 
             var doc = new DocumentoRecord
@@ -261,12 +463,13 @@ namespace CitaPDF
             }
             else
             {
-                Log($"Consultando modelo local para {etiqueta}...", "SPINNER", overwrite: true);
                 bool listo = await LlamaServerProceso.AsegurarIniciadoAsync((msg, nivel, overwrite) => Log(msg, nivel, overwrite));
+                ActualizarEstadoServidor();
 
                 ExtraccionResultado? resultado = null;
                 if (listo)
                 {
+                    IniciarSpinner($"Consultando modelo local para {etiqueta}...");
                     try
                     {
                         resultado = await ExtraccionLlm.ExtraerAsync(texto);
@@ -274,6 +477,10 @@ namespace CitaPDF
                     catch (Exception ex)
                     {
                         Log($"Error consultando el modelo local para {etiqueta}: {ex.Message}", "ERROR");
+                    }
+                    finally
+                    {
+                        DetenerSpinner();
                     }
                 }
 
@@ -306,7 +513,12 @@ namespace CitaPDF
 
         private void BtnVerBiblioteca_Click(object sender, RoutedEventArgs e)
         {
+            if (AvisarSiIndexando()) return;
             new BibliotecaWindow() { Owner = this }.ShowDialog();
+            // La biblioteca completa permite editar y borrar registros --
+            // releer y refrescar por si el catálogo cambió.
+            _documentos = Biblioteca.CargarDocumentos();
+            ActualizarGrid();
         }
 
         private void BtnConfiguracion_Click(object sender, RoutedEventArgs e)
@@ -316,6 +528,7 @@ namespace CitaPDF
             {
                 Biblioteca.GuardarSettings(_settings);
                 ActualizarGrid();
+                AplicarTema();
             }
         }
 
