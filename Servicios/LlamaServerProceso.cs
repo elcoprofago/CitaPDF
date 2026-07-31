@@ -23,6 +23,12 @@ namespace CitaPDF.Servicios
 
         private static Process? _proceso;
 
+        // Últimas líneas de stderr del proceso -- si llama-server se cierra
+        // inesperadamente durante el arranque (crash, falta de VRAM, etc.),
+        // esto es lo único que permite diagnosticar por qué sin adivinar.
+        private static readonly Queue<string> _ultimasLineasError = new();
+        private const int MaxLineasError = 20;
+
         public static bool EstaCorriendo => _proceso != null && !_proceso.HasExited;
 
         // log recibe (mensaje, nivel, overwrite) -- mismos parámetros que
@@ -62,9 +68,18 @@ namespace CitaPDF.Servicios
 
                 psi.EnvironmentVariables["PATH"] = VendorPath + ";" + Environment.GetEnvironmentVariable("PATH");
 
+                _ultimasLineasError.Clear();
                 _proceso = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 _proceso.OutputDataReceived += (s, ev) => { };
-                _proceso.ErrorDataReceived += (s, ev) => { };
+                _proceso.ErrorDataReceived += (s, ev) =>
+                {
+                    if (string.IsNullOrEmpty(ev.Data)) return;
+                    lock (_ultimasLineasError)
+                    {
+                        _ultimasLineasError.Enqueue(ev.Data);
+                        if (_ultimasLineasError.Count > MaxLineasError) _ultimasLineasError.Dequeue();
+                    }
+                };
                 _proceso.Start();
                 _proceso.BeginOutputReadLine();
                 _proceso.BeginErrorReadLine();
@@ -87,7 +102,11 @@ namespace CitaPDF.Servicios
             {
                 if (_proceso == null || _proceso.HasExited)
                 {
-                    log?.Invoke("llama-server se cerró inesperadamente durante el arranque.", "ERROR", false);
+                    string detalle;
+                    lock (_ultimasLineasError) detalle = string.Join(" | ", _ultimasLineasError);
+                    log?.Invoke(string.IsNullOrWhiteSpace(detalle)
+                        ? "llama-server se cerró inesperadamente durante el arranque."
+                        : $"llama-server se cerró inesperadamente durante el arranque: {detalle}", "ERROR", false);
                     return false;
                 }
 

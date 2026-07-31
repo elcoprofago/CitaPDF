@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using UglyToad.PdfPig;
 
@@ -22,8 +23,15 @@ namespace CitaPDF.Servicios
             var sb = new StringBuilder();
             int n = Math.Min(PaginasAExtraer, pdf.NumberOfPages);
 
+            // page.Text concatena las letras del PDF sin segmentar en
+            // palabras -- en layouts a varias columnas (común en papers
+            // académicos) eso pega palabras entre sí ("AttentionIsAllYou...")
+            // y le complica la lectura al LLM. GetWords() ya viene segmentado
+            // por palabra (NearestNeighbourWordExtractor), así que unirlas
+            // con espacio da texto legible aunque se pierda el layout exacto
+            // -- no hace falta para extraer título/autores/año/editorial.
             foreach (var page in pdf.GetPages().Take(n))
-                sb.AppendLine(page.Text);
+                sb.AppendLine(string.Join(" ", page.GetWords().Select(w => w.Text)));
 
             return sb.ToString().Trim();
         }
