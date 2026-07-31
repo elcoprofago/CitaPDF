@@ -1,0 +1,23 @@
+<Window x:Class="CitaPDF.DuplicadoWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Documento duplicado" Height="200" Width="440" WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize" ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="TxtMensaje" Grid.Row="0" TextWrapping="Wrap" VerticalAlignment="Center"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="BtnAgregar" Content="Agregar de todos modos" Padding="10,6" Click="BtnAgregar_Click"/>
+            <Button x:Name="BtnSaltearTodo" Content="Saltear todo" Padding="10,6" Margin="8,0,0,0" Click="BtnSaltearTodo_Click"/>
+            <Button x:Name="BtnSaltear" Content="Saltear" Padding="10,6" Margin="8,0,0,0" Click="BtnSaltear_Click" IsDefault="True" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

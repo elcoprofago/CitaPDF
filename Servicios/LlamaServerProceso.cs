@@ -59,7 +59,20 @@ namespace CitaPDF.Servicios
                 psi.ArgumentList.Add("--model"); psi.ArgumentList.Add(ModeloPath);
                 psi.ArgumentList.Add("--host"); psi.ArgumentList.Add("127.0.0.1");
                 psi.ArgumentList.Add("--port"); psi.ArgumentList.Add(Puerto.ToString());
-                psi.ArgumentList.Add("--ctx-size"); psi.ArgumentList.Add("8192");
+                // 8192 alcanzaba con el tope viejo de texto (6000 caracteres);
+                // al subir la extracción a 10 páginas / 20000 caracteres
+                // (ExtraccionLlm.MaxCaracteresTexto) algunos documentos con
+                // texto denso superaban el contexto y llama-server devolvía
+                // 400 Bad Request. 32768 lo resolvía, pero llama.cpp reserva
+                // el caché KV para TODO --ctx-size ya al arrancar (no según
+                // el prompt real): cuadruplicar el contexto cuadruplica esa
+                // reserva de VRAM, y si eso no entra junto con los pesos del
+                // modelo, --n-gpu-layers 99 igual intenta cargar todo y el
+                // resto termina compitiendo por memoria -- generación mucho
+                // más lenta incluso en documentos cortos. 16384 alcanza de
+                // sobra para 20000 caracteres (~10000 tokens en el peor caso)
+                // con una reserva de KV cache bastante menor.
+                psi.ArgumentList.Add("--ctx-size"); psi.ArgumentList.Add("16384");
                 psi.ArgumentList.Add("--n-gpu-layers"); psi.ArgumentList.Add("99");
                 psi.ArgumentList.Add("--parallel"); psi.ArgumentList.Add("1");
                 psi.ArgumentList.Add("--flash-attn"); psi.ArgumentList.Add("on");

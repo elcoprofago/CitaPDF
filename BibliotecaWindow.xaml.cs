@@ -1,5 +1,8 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using CitaPDF.Servicios;
 
@@ -43,8 +46,6 @@ namespace CitaPDF
             set => Documento.Editorial = value?.Trim() ?? "";
         }
 
-        public string FechaTexto => Documento.FechaAdquisicion.ToString("yyyy-MM-dd");
-
         public string Url
         {
             get => Documento.OrigenUrl ?? "";
@@ -55,6 +56,11 @@ namespace CitaPDF
     public partial class BibliotecaWindow : Window
     {
         private List<DocumentoRecord> _todos = new();
+
+        // IDs editados/corregidos durante esta sesión de la ventana -- lo
+        // consulta MainWindow al cerrar el diálogo para pasar esas filas de
+        // "recién agregado" (rojo) a "corregido" (verde oscuro).
+        public HashSet<string> IdsModificados { get; } = new();
 
         public BibliotecaWindow()
         {
@@ -93,9 +99,18 @@ namespace CitaPDF
 
         private void GridBiblioteca_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            // El propio doble clic puede haber dejado la celda en edición
+            // (el primer clic de los dos la abre) -- si no se confirma antes,
+            // reasignar ItemsSource en AplicarFiltro() revienta con
+            // "Sorting no permitido durante EditItem".
+            if (GridBiblioteca.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Cell, true))
+                GridBiblioteca.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
+
             if (GridBiblioteca.SelectedItem is BibliotecaRow fila)
             {
-                new CitacionWindow(fila.Documento) { Owner = this }.ShowDialog();
+                var ventana = new CitacionWindow(fila.Documento) { Owner = this };
+                ventana.ShowDialog();
+                if (ventana.SeGuardo) IdsModificados.Add(fila.Documento.DocumentoId);
                 _todos = Biblioteca.CargarDocumentos();
                 AplicarFiltro();
             }
@@ -105,26 +120,71 @@ namespace CitaPDF
         {
             if (e.EditAction != System.Windows.Controls.DataGridEditAction.Commit) return;
             if (e.Row.Item is not BibliotecaRow fila) return;
+            if (e.EditingElement is not TextBox caja) return;
 
-            bool esUrl = e.Column.Header?.ToString() == "URL";
-
-            // CellEditEnding se dispara antes de que el binding empuje el
-            // valor editado al origen -- se pospone al final del ciclo del
-            // Dispatcher para que Documento ya tenga el dato nuevo.
-            Dispatcher.BeginInvoke(new Action(() =>
+            // No depender de que el binding ya haya empujado el valor editado
+            // al origen (CellEditEnding se dispara antes de eso y el momento
+            // exacto no está garantizado) -- se lee directo del control.
+            string valor = caja.Text;
+            string header = e.Column.Header?.ToString() ?? "";
+            switch (header)
             {
-                // El año/título/autor/editorial sí se consideran parte de la
-                // extracción automática; la URL es metadata aparte que suele
-                // completarse después, así que no debe marcar la cita como
-                // "para revisar".
-                if (!esUrl) fila.Documento.ExtraidoAutomaticamente = false;
+                case "Título": fila.Titulo = valor; break;
+                case "Autores": fila.AutoresTexto = valor; break;
+                case "Año": fila.Anio = valor; break;
+                case "Editorial": fila.Editorial = valor; break;
+                case "URL": fila.Url = valor; break;
+                default: return;
+            }
 
-                fila.Documento.CitaApa = CitaApa.Construir(
-                    fila.Documento.AutoresApa, fila.Documento.Anio, fila.Documento.Titulo,
-                    fila.Documento.Editorial, fila.Documento.OrigenUrl);
+            // El año/título/autor/editorial sí se consideran parte de la
+            // extracción automática; la URL es metadata aparte que suele
+            // completarse después, así que no debe marcar la cita como
+            // "para revisar".
+            if (header != "URL") fila.Documento.ExtraidoAutomaticamente = false;
 
-                Biblioteca.GuardarDocumentos(_todos);
-            }));
+            fila.Documento.CitaApa = CitaApa.Construir(
+                fila.Documento.AutoresApa, fila.Documento.Anio, fila.Documento.Titulo,
+                fila.Documento.Editorial, fila.Documento.OrigenUrl);
+
+            Biblioteca.GuardarDocumentos(_todos);
+            IdsModificados.Add(fila.Documento.DocumentoId);
+        }
+
+        // Reemplaza la columna "Adquirido" (tampoco resultaba de utilidad)
+        // por un enlace directo al documento -- mismo criterio de apertura
+        // que CitacionWindow / MainWindow.
+        private void LinkAbrirDocumento_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Hyperlink link || link.DataContext is not BibliotecaRow fila) return;
+            var documento = fila.Documento;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(documento.OrigenUrl))
+                {
+                    Process.Start(new ProcessStartInfo(documento.OrigenUrl) { UseShellExecute = true });
+                }
+                else if (!string.IsNullOrWhiteSpace(documento.RutaArchivoOriginal))
+                {
+                    if (!File.Exists(documento.RutaArchivoOriginal))
+                    {
+                        MessageBox.Show(this, "No se encontró el archivo en la ruta guardada:\n" + documento.RutaArchivoOriginal,
+                            "Archivo no disponible", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    Process.Start(new ProcessStartInfo(documento.RutaArchivoOriginal) { UseShellExecute = true });
+                }
+                else
+                {
+                    MessageBox.Show(this, "Este documento no tiene una ruta local ni una URL de origen guardada.",
+                        "Sin origen", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "No se pudo abrir: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         // El clic derecho no mueve la selección por defecto en un DataGrid

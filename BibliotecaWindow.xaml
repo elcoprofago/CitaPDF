@@ -46,7 +46,15 @@
                 <DataGridTextColumn Header="Autores" Binding="{Binding AutoresTexto}" SortMemberPath="AutoresTexto" Width="2*"/>
                 <DataGridTextColumn Header="Año" Binding="{Binding Anio}" Width="70"/>
                 <DataGridTextColumn Header="Editorial" Binding="{Binding Editorial}" Width="2*"/>
-                <DataGridTextColumn Header="Adquirido" Binding="{Binding FechaTexto}" Width="110" IsReadOnly="True"/>
+                <DataGridTemplateColumn Header="Documento" Width="80" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Hyperlink Click="LinkAbrirDocumento_Click">Abrir</Hyperlink>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="URL" Binding="{Binding Url}" Width="2*"/>
             </DataGrid.Columns>
         </DataGrid>

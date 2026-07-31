@@ -7,10 +7,12 @@ namespace CitaPDF.Servicios
     // Extracción de texto plano de las primeras páginas con PdfPig -- el
     // título y los datos editoriales de un libro/artículo/capítulo casi
     // siempre están en la portada o la portadilla de copyright, así que no
-    // hace falta leer el documento completo.
+    // hace falta leer el documento completo. En revistas/actas de congreso
+    // la editorial a veces figura recién en una portadilla varias páginas
+    // adentro, de ahí el margen hasta 10.
     public static class PdfTexto
     {
-        private const int PaginasAExtraer = 3;
+        private const int PaginasAExtraer = 10;
 
         // Umbral por debajo del cual se asume que el PDF no tiene capa de
         // texto (escaneado) -- no se rechaza el documento, el llamador debe

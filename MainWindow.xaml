@@ -28,6 +28,23 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- La plantilla nativa de ProgressBar (tema Aero2) ignora Foreground
+             para el indicador de progreso; esta plantilla lo respeta. -->
+        <Style x:Key="BarraProgresoStyle" TargetType="ProgressBar">
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"/>
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}"
+                                    CornerRadius="3" HorizontalAlignment="Left"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -125,6 +142,23 @@
                   SelectionMode="Single" SelectionUnit="FullRow"
                   MouseDoubleClick="GridDocumentos_MouseDoubleClick"
                   PreviewMouseRightButtonDown="GridDocumentos_PreviewMouseRightButtonDown">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Style.Triggers>
+                        <!-- Documentos incorporados en el último lote: en rojo
+                             hasta que se reinicie la app, para tenerlos
+                             controlados aunque ya no queden "arriba". -->
+                        <DataTrigger Binding="{Binding EsNuevo}" Value="True">
+                            <Setter Property="Foreground" Value="Red"/>
+                        </DataTrigger>
+                        <!-- Una vez corregido/editado, pasa de rojo a verde
+                             oscuro en vez de perder el resaltado. -->
+                        <DataTrigger Binding="{Binding EsCorregido}" Value="True">
+                            <Setter Property="Foreground" Value="DarkGreen"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Borrar registro" Click="MenuBorrarRegistro_Click"/>
@@ -135,7 +169,15 @@
                 <DataGridTextColumn Header="Autores" Binding="{Binding AutoresTexto}" SortMemberPath="AutoresTexto" Width="2*"/>
                 <DataGridTextColumn Header="Año" Binding="{Binding Anio}" Width="70"/>
                 <DataGridTextColumn Header="Editorial" Binding="{Binding Editorial}" Width="2*"/>
-                <DataGridTextColumn Header="Estado" Binding="{Binding Estado}" Width="140"/>
+                <DataGridTemplateColumn Header="Documento" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Hyperlink Click="LinkAbrirDocumento_Click">Abrir</Hyperlink>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
@@ -155,7 +197,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <ProgressBar x:Name="BarraProgreso" Grid.Column="0" Height="16" Minimum="0" Maximum="100"
-                             Foreground="#FF0080FF"/>
+                             Foreground="#FF0066FF" Style="{StaticResource BarraProgresoStyle}"/>
                 <TextBlock x:Name="TxtProgreso" Grid.Column="1" Margin="8,0,0,0"
                            VerticalAlignment="Center" FontSize="11"/>
             </Grid>

@@ -45,12 +45,12 @@ namespace CitaPDF.Servicios
             Texto:
             """;
 
-        // Tope de caracteres del texto que se manda al prompt: el título,
-        // los autores y los datos editoriales están casi siempre en la
-        // primera página o dos -- acotar esto evita que un PDF con mucho
-        // texto en sus primeras ~3 páginas dispare un prompt gigante y una
-        // latencia desproporcionada en un modelo local.
-        private const int MaxCaracteresTexto = 6000;
+        // Tope de caracteres del texto que se manda al prompt -- acotado para
+        // no disparar un prompt gigante y una latencia desproporcionada en un
+        // modelo local, pero lo bastante amplio como para cubrir las ~10
+        // páginas que ahora extrae PdfTexto (algunos documentos tienen los
+        // datos editoriales recién en una portadilla varias páginas adentro).
+        private const int MaxCaracteresTexto = 20000;
 
         public static async Task<ExtraccionResultado> ExtraerAsync(string textoPrimerasPaginas)
         {
@@ -71,8 +71,12 @@ namespace CitaPDF.Servicios
 
             // Generar en un modelo local puede tardar bastante (medido:
             // ~45s para un documento chico) -- un timeout generoso evita
-            // descartar una extracción que sólo iba lenta.
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(180) };
+            // descartar una extracción que sólo iba lenta. Con el tope de
+            // texto en 20000 caracteres, un artículo breve pero con prosa
+            // densa (poco margen/whitespace, típico de un paper corto) puede
+            // generar un prompt tan largo como el de un libro de más
+            // páginas, así que el margen tiene que cubrir ese caso también.
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(300) };
             using var resp = await http.PostAsJsonAsync(
                 $"http://127.0.0.1:{LlamaServerProceso.Puerto}/v1/chat/completions", payload);
             resp.EnsureSuccessStatusCode();

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,21 +18,42 @@ namespace CitaPDF
     public class DocumentoRow
     {
         public DocumentoRecord Documento { get; }
-        public DocumentoRow(DocumentoRecord documento) => Documento = documento;
+
+        // Marca los documentos incorporados en el último lote procesado --
+        // sólo en memoria (se pierde al reiniciar la app) para que el
+        // usuario tenga a la vista cuáles todavía no revisó. Una vez que el
+        // usuario corrige/edita uno de esos, pasa de "nuevo" (rojo) a
+        // "corregido" (verde oscuro) en vez de perder el resaltado.
+        public bool EsNuevo { get; }
+        public bool EsCorregido { get; }
+
+        public DocumentoRow(DocumentoRecord documento, bool esNuevo = false, bool esCorregido = false)
+        {
+            Documento = documento;
+            EsCorregido = esCorregido;
+            EsNuevo = esNuevo && !esCorregido;
+        }
 
         public string Titulo => Documento.Titulo;
         public string Anio => Documento.Anio;
         public string Editorial => Documento.Editorial;
         public string AutoresTexto => string.Join("; ", Documento.AutoresApa ?? new List<string>());
-        public string Estado => Documento.ExtraidoAutomaticamente
-            ? "Guardado"
-            : "Guardado (revisar datos)";
     }
 
     public partial class MainWindow : Window
     {
         private AppSettings _settings = new();
         private List<DocumentoRecord> _documentos = new();
+        private readonly HashSet<string> _idsRecienAgregados = new();
+        // IDs corregidos/editados desde que se agregaron -- también en
+        // memoria, no persiste al reiniciar. Prevalece sobre EsNuevo (ver
+        // DocumentoRow) para pasar de rojo a verde oscuro sin perder el
+        // resaltado de "algo pasó con este documento".
+        private readonly HashSet<string> _idsCorregidos = new();
+        // "Saltear todo" en el diálogo de duplicado se aplica al resto del
+        // lote en curso -- se resetea en cada ProcesarLoteAsync, no persiste
+        // entre lotes distintos.
+        private bool _saltearDuplicadosEnLote;
         private readonly bool _autoScrollLog = true;
 
         // Spinner estilo consola (mismo patrón que PostOCRNormalizer) para
@@ -186,7 +208,7 @@ namespace CitaPDF
             var recientes = _documentos
                 .OrderByDescending(d => d.FechaAdquisicion)
                 .Take(Math.Max(3, _settings.FilasVisiblesEnGrid))
-                .Select(d => new DocumentoRow(d))
+                .Select(d => new DocumentoRow(d, _idsRecienAgregados.Contains(d.DocumentoId), _idsCorregidos.Contains(d.DocumentoId)))
                 .ToList();
 
             GridDocumentos.ItemsSource = recientes;
@@ -211,11 +233,49 @@ namespace CitaPDF
             if (AvisarSiIndexando()) return;
             if (GridDocumentos.SelectedItem is DocumentoRow fila)
             {
-                new CitacionWindow(fila.Documento) { Owner = this }.ShowDialog();
+                var ventana = new CitacionWindow(fila.Documento) { Owner = this };
+                ventana.ShowDialog();
+                if (ventana.SeGuardo) _idsCorregidos.Add(fila.Documento.DocumentoId);
                 // La ventana de cita puede haber corregido datos -- releer y
                 // refrescar por si cambió algo.
                 _documentos = Biblioteca.CargarDocumentos();
                 ActualizarGrid();
+            }
+        }
+
+        // Reemplaza la columna "Estado" (poco útil: el usuario ya ve si algo
+        // quedó "para revisar" por el resaltado en rojo) por un enlace directo
+        // al documento -- mismo criterio de apertura que CitacionWindow.
+        private void LinkAbrirDocumento_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Hyperlink link || link.DataContext is not DocumentoRow fila) return;
+            var documento = fila.Documento;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(documento.OrigenUrl))
+                {
+                    Process.Start(new ProcessStartInfo(documento.OrigenUrl) { UseShellExecute = true });
+                }
+                else if (!string.IsNullOrWhiteSpace(documento.RutaArchivoOriginal))
+                {
+                    if (!File.Exists(documento.RutaArchivoOriginal))
+                    {
+                        MessageBox.Show(this, "No se encontró el archivo en la ruta guardada:\n" + documento.RutaArchivoOriginal,
+                            "Archivo no disponible", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    Process.Start(new ProcessStartInfo(documento.RutaArchivoOriginal) { UseShellExecute = true });
+                }
+                else
+                {
+                    MessageBox.Show(this, "Este documento no tiene una ruta local ni una URL de origen guardada.",
+                        "Sin origen", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "No se pudo abrir: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -339,6 +399,7 @@ namespace CitaPDF
             }
 
             _procesando = true;
+            _saltearDuplicadosEnLote = false;
             BtnAgregarArchivos.IsEnabled = false;
             BtnAgregarCarpeta.IsEnabled = false;
             BtnAgregarUrl.IsEnabled = false;
@@ -378,6 +439,9 @@ namespace CitaPDF
             // grid con "Ver cita" bajo demanda.
             if (items.Count == 1 && agregados.Count == 1)
                 new CitacionWindow(agregados[0]) { Owner = this }.ShowDialog();
+
+            foreach (var doc in agregados)
+                _idsRecienAgregados.Add(doc.DocumentoId);
 
             _documentos = Biblioteca.CargarDocumentos();
             ActualizarGrid();
@@ -419,10 +483,19 @@ namespace CitaPDF
             var existente = _documentos.FirstOrDefault(d => d.HashSha256 == hash);
             if (existente != null)
             {
-                var confirmar = MessageBox.Show(this,
-                    $"{etiqueta} ya está catalogado como {existente.DocumentoId} ({existente.Titulo}).\n\n¿Agregarlo de todos modos como una entrada nueva?",
-                    "Documento duplicado", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (confirmar != MessageBoxResult.Yes)
+                if (_saltearDuplicadosEnLote)
+                {
+                    Log($"{etiqueta}: duplicado de {existente.DocumentoId}, salteado (Saltear todo).", "WARN");
+                    return;
+                }
+
+                var dialogo = new DuplicadoWindow(etiqueta, existente) { Owner = this };
+                dialogo.ShowDialog();
+
+                if (dialogo.Resultado == ResultadoDuplicado.SaltearTodo)
+                    _saltearDuplicadosEnLote = true;
+
+                if (dialogo.Resultado != ResultadoDuplicado.AgregarIgual)
                 {
                     Log($"{etiqueta}: duplicado de {existente.DocumentoId}, no se agregó.", "WARN");
                     return;
@@ -514,7 +587,9 @@ namespace CitaPDF
         private void BtnVerBiblioteca_Click(object sender, RoutedEventArgs e)
         {
             if (AvisarSiIndexando()) return;
-            new BibliotecaWindow() { Owner = this }.ShowDialog();
+            var ventana = new BibliotecaWindow() { Owner = this };
+            ventana.ShowDialog();
+            foreach (var id in ventana.IdsModificados) _idsCorregidos.Add(id);
             // La biblioteca completa permite editar y borrar registros --
             // releer y refrescar por si el catálogo cambió.
             _documentos = Biblioteca.CargarDocumentos();

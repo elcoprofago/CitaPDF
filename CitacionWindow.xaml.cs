@@ -10,6 +10,11 @@ namespace CitaPDF
         private readonly DocumentoRecord _documento;
         private bool _enEdicion;
 
+        // El llamador (MainWindow/BibliotecaWindow) lo consulta al cerrar el
+        // diálogo para saber si corresponde pasar la fila de "recién
+        // agregado" (rojo) a "corregido" (verde oscuro).
+        public bool SeGuardo { get; private set; }
+
         public CitacionWindow(DocumentoRecord documento)
         {
             InitializeComponent();
@@ -29,6 +34,7 @@ namespace CitaPDF
             TxtAutores.Text = string.Join(Environment.NewLine, _documento.AutoresApa);
             TxtAnio.Text = _documento.Anio;
             TxtEditorial.Text = _documento.Editorial;
+            TxtUrl.Text = _documento.OrigenUrl ?? "";
             TxtCita.Text = _documento.CitaApa;
         }
 
@@ -39,6 +45,7 @@ namespace CitaPDF
             TxtAutores.IsReadOnly = !habilitar;
             TxtAnio.IsReadOnly = !habilitar;
             TxtEditorial.IsReadOnly = !habilitar;
+            TxtUrl.IsReadOnly = !habilitar;
             BtnReconstruir.IsEnabled = habilitar;
             BtnCorregir.Content = habilitar ? "Cancelar corrección" : "Corregir";
         }
@@ -64,6 +71,7 @@ namespace CitaPDF
             _documento.AutoresApa = autores;
             _documento.Anio = TxtAnio.Text.Trim();
             _documento.Editorial = TxtEditorial.Text.Trim();
+            _documento.OrigenUrl = string.IsNullOrWhiteSpace(TxtUrl.Text) ? null : TxtUrl.Text.Trim();
             _documento.CitaApa = CitaApa.Construir(autores, _documento.Anio, _documento.Titulo, _documento.Editorial, _documento.OrigenUrl);
             _documento.ExtraidoAutomaticamente = false;
 
@@ -75,6 +83,7 @@ namespace CitaPDF
             if (idx >= 0) documentos[idx] = _documento;
             else documentos.Add(_documento);
             Biblioteca.GuardarDocumentos(documentos);
+            SeGuardo = true;
 
             HabilitarEdicion(false);
         }
