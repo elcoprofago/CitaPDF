@@ -4,14 +4,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Configuración" Height="340" Width="480" WindowStartupLocation="CenterOwner"
+        Title="Configuración" SizeToContent="Height" Width="620" WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
     <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -24,7 +24,13 @@
 
         <StackPanel Grid.Row="1" Margin="0,16,0,0">
             <TextBlock Text="Carpeta de datos (config.json / biblioteca.json):" FontWeight="Bold"/>
-            <TextBox x:Name="TxtCarpetaDatos" Margin="0,4,0,0" IsReadOnly="True" Background="#FFF0F0F0"/>
+            <DockPanel Margin="0,4,0,0">
+                <Button x:Name="BtnGuardarCopia" DockPanel.Dock="Right" Content="Guardar copia..." Padding="10,4"
+                        Margin="8,0,0,0" Click="BtnGuardarCopia_Click"
+                        ToolTip="Guarda una copia de biblioteca.json en la ubicación que elijas"/>
+                <TextBox x:Name="TxtCarpetaDatos" IsReadOnly="True" Background="#FFF0F0F0"
+                         VerticalContentAlignment="Center"/>
+            </DockPanel>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Margin="0,16,0,0">
@@ -45,7 +51,31 @@
             </StackPanel>
         </StackPanel>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+        <StackPanel Grid.Row="3" Margin="0,16,0,0">
+            <TextBlock Text="Modelo local:" FontWeight="Bold"/>
+            <TextBlock Text="Servidor (llama-server.exe):" Margin="0,4,0,0"/>
+            <DockPanel Margin="0,2,0,0">
+                <Button DockPanel.Dock="Right" Content="Buscar..." Padding="10,4" Margin="6,0,0,0"
+                        Click="BtnBuscarServidor_Click" ToolTip="Buscar llama-server.exe en todas las unidades"/>
+                <Button DockPanel.Dock="Right" Content="Examinar..." Padding="10,4" Margin="8,0,0,0"
+                        Click="BtnExaminarServidor_Click"/>
+                <TextBox x:Name="TxtRutaServidor" IsReadOnly="True" Background="#FFF0F0F0"
+                         VerticalContentAlignment="Center"/>
+            </DockPanel>
+            <TextBlock Text="Modelo (.gguf):" Margin="0,6,0,0"/>
+            <DockPanel Margin="0,2,0,0">
+                <Button DockPanel.Dock="Right" Content="Buscar..." Padding="10,4" Margin="6,0,0,0"
+                        Click="BtnBuscarModelo_Click" ToolTip="Buscar modelos .gguf en todas las unidades"/>
+                <Button DockPanel.Dock="Right" Content="Examinar..." Padding="10,4" Margin="8,0,0,0"
+                        Click="BtnExaminarModelo_Click"/>
+                <TextBox x:Name="TxtRutaModelo" IsReadOnly="True" Background="#FFF0F0F0"
+                         VerticalContentAlignment="Center"/>
+            </DockPanel>
+            <TextBlock x:Name="TxtAvisoRutas" Margin="0,4,0,0" Foreground="Gray" FontStyle="Italic"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Name="BtnGuardar" Content="Guardar" Padding="10,6" Click="BtnGuardar_Click" IsDefault="True"/>
             <Button x:Name="BtnCancelar" Content="Cancelar" Padding="10,6" Margin="8,0,0,0" Click="BtnCancelar_Click" IsCancel="True"/>
         </StackPanel>

@@ -16,13 +16,83 @@ namespace CitaPDF.Servicios
         private static readonly JsonSerializerOptions JsonOptsEscritura =
             new() { WriteIndented = true };
 
+        // Modo portable: si junto al .exe existe la carpeta "datos" (la crea
+        // el perfil de publicación), los datos viven ahí y viajan con el
+        // pendrive. Si no existe (p. ej. compilación Debug), se usa
+        // Documentos\CitaPDF como siempre.
+        private static string? _dataDir;
+
+        // Resultado de la copia inicial a "datos", para que MainWindow lo
+        // muestre en el log al arrancar (null si no hubo nada que informar).
+        public static string? MensajeArranque { get; private set; }
+        public static bool MensajeArranqueEsError { get; private set; }
+
+        private static string DocumentosDir => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CitaPDF");
+
+        private static string PortableDir => Path.Combine(Rutas.BaseDir, "datos");
+
         public static string GetDataDir()
         {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "CitaPDF");
+            if (_dataDir != null) return _dataDir;
+
+            string dir = DocumentosDir;
+            if (Directory.Exists(PortableDir))
+            {
+                dir = PortableDir;
+                if (!CopiarDesdeDocumentosSiCorresponde())
+                    dir = DocumentosDir;
+            }
             Directory.CreateDirectory(dir);
+            _dataDir = dir;
             return dir;
+        }
+
+        // Primera vez de la versión portable en una PC que ya tenía datos en
+        // Documentos: se COPIAN (nunca se mueven ni se pisan) a "datos". Sólo
+        // si "datos" no tiene todavía ni biblioteca.json ni config.json: si
+        // ya tiene algo, esos son los datos portables y no se tocan.
+        // Devuelve false si la copia falló -- en ese caso esta sesión sigue
+        // en Documentos, para no arrancar con una biblioteca vacía que
+        // parezca la real.
+        private static bool CopiarDesdeDocumentosSiCorresponde()
+        {
+            string[] nombres = { "biblioteca.json", "config.json" };
+            if (nombres.Any(n => File.Exists(Path.Combine(PortableDir, n)))) return true;
+            if (!nombres.Any(n => File.Exists(Path.Combine(DocumentosDir, n)))) return true;
+
+            // Lo creado en este intento: si algo falla se borra, para que la
+            // próxima ejecución no tome una copia a medias como datos
+            // portables válidos (sólo esto -- "datos" estaba vacío de .json).
+            var creados = new List<string>();
+            try
+            {
+                foreach (var n in nombres)
+                {
+                    string origen = Path.Combine(DocumentosDir, n);
+                    if (!File.Exists(origen)) continue;
+                    string destino = Path.Combine(PortableDir, n);
+                    byte[] contenido = File.ReadAllBytes(origen);
+                    creados.Add(destino + ".tmp");
+                    File.WriteAllBytes(destino + ".tmp", contenido);
+                    File.Move(destino + ".tmp", destino, overwrite: false);
+                    creados.Add(destino);
+                    if (!contenido.AsSpan().SequenceEqual(File.ReadAllBytes(destino)))
+                        throw new IOException($"La copia de {n} no coincide con el original.");
+                }
+                MensajeArranque = $"Primera ejecución portable: se copiaron los datos de {DocumentosDir} a {PortableDir} (los originales quedan intactos).";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                foreach (var f in creados)
+                {
+                    try { File.Delete(f); } catch { }
+                }
+                MensajeArranque = $"No se pudieron copiar los datos a {PortableDir} ({ex.Message}). Esta sesión usa {DocumentosDir}.";
+                MensajeArranqueEsError = true;
+                return false;
+            }
         }
 
         public static string GetConfigPath() => Path.Combine(GetDataDir(), "config.json");
@@ -76,6 +146,35 @@ namespace CitaPDF.Servicios
             var archivo = new BibliotecaFile { Documentos = documentos };
             string json = JsonSerializer.Serialize(archivo, JsonOptsEscritura);
             EscribirAtomico(GetBibliotecaPath(), json);
+        }
+
+        // Copia de respaldo de biblioteca.json a una ruta elegida por el
+        // usuario. Se copia vía .tmp + Move (mismo criterio que
+        // EscribirAtomico) para que un respaldo anterior en el destino nunca
+        // quede a medio pisar, y después se relee la copia: devuelve la
+        // cantidad de documentos verificados, o lanza si la copia no coincide.
+        public static int ExportarCopia(string destino)
+        {
+            string origen = GetBibliotecaPath();
+            if (!File.Exists(origen))
+                throw new FileNotFoundException("Todavía no hay biblioteca.json para copiar.", origen);
+
+            if (string.Equals(Path.GetFullPath(destino), Path.GetFullPath(origen), StringComparison.OrdinalIgnoreCase))
+                throw new IOException("El destino es el mismo biblioteca.json en uso. Elegí otra ubicación o nombre.");
+
+            byte[] contenido = File.ReadAllBytes(origen);
+            string tmp = destino + ".tmp";
+            File.WriteAllBytes(tmp, contenido);
+            File.Move(tmp, destino, overwrite: true);
+
+            byte[] copia = File.ReadAllBytes(destino);
+            if (!contenido.AsSpan().SequenceEqual(copia))
+                throw new IOException("La copia escrita no coincide con el original.");
+
+            // ReadAllText y no Encoding.UTF8.GetString: biblioteca.json lleva
+            // BOM (EscribirAtomico) y GetString lo deja pegado al JSON.
+            var archivo = JsonSerializer.Deserialize<BibliotecaFile>(File.ReadAllText(destino, Encoding.UTF8), JsonOptsLectura);
+            return archivo?.Documentos.Count ?? 0;
         }
 
         // Escritura vía archivo temporal + File.Move: si la app se cierra a

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -19,7 +20,9 @@ namespace CitaPDF.Servicios
     // cita final: eso lo hace CitaApa.Construir de forma determinística.
     public static class ExtraccionLlm
     {
-        private const string Modelo = "Phi-3-medium-128k-instruct-Q3_K_S.gguf";
+        // llama-server sirve un único modelo e ignora este campo; se manda el
+        // nombre del .gguf configurado sólo para que los logs sean legibles.
+        private static string Modelo => Path.GetFileName(LlamaServerProceso.ModeloPath);
 
         private const string PromptBase = """
             Sos un asistente que extrae datos bibliográficos de las primeras páginas de

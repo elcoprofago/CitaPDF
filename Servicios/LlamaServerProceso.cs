@@ -5,8 +5,8 @@ using System.Net.Http;
 
 namespace CitaPDF.Servicios
 {
-    // Ciclo de vida del llama-server propio de CitaPDF -- mismo binario y
-    // modelo que usan CSJN/PGN/Académico, pero en su propio puerto (9002)
+    // Ciclo de vida del llama-server propio de CitaPDF -- mismo modelo que
+    // usan CSJN/PGN/Académico, pero en su propio puerto (9002)
     // para poder correr standalone. Arranque perezoso (primer PDF agregado
     // en la sesión), sin botón "Iniciar LLM": acá el LLM es un detalle de
     // implementación interno, no algo que el usuario deba operar.
@@ -14,12 +14,41 @@ namespace CitaPDF.Servicios
     {
         public const int Puerto = 9002;
 
-        private const string ModeloPath =
+        // Rutas efectivas, fijadas desde config.json con Configurar(). El
+        // build de llama.cpp tiene que ser autónomo (sus DLL de CUDA en la
+        // misma carpeta): no se suma nada al PATH.
+        public static string ServidorExe { get; private set; } = "";
+        public static string ModeloPath { get; private set; } = "";
+
+        // Detección automática cuando config.json no tiene ruta elegida:
+        // primero la estructura portable junto al .exe, después las rutas
+        // de esta PC que se usaban antes de que existiera la configuración.
+        private static readonly string ServidorAnterior = @"E:\llama-server\llama-server.exe";
+        private static readonly string ModeloAnterior =
             @"E:\Models\bartowski\Phi-3-medium-128k-instruct-GGUF\Phi-3-medium-128k-instruct-Q3_K_S.gguf";
-        private const string ServidorExe =
-            @"C:\Users\Rodolfo\.lmstudio\extensions\backends\llama.cpp-win-x86_64-nvidia-cuda12-avx2-2.23.1\llama-server.exe";
-        private const string VendorPath =
-            @"C:\Users\Rodolfo\.lmstudio\extensions\backends\vendor\win-llama-cuda12-vendor-v2";
+
+        public static void Configurar(AppSettings settings)
+        {
+            ServidorExe = Rutas.Resolver(settings.RutaServidor);
+            if (ServidorExe == "")
+            {
+                string portable = Path.Combine(Rutas.BaseDir, "llama-server", "llama-server.exe");
+                ServidorExe = File.Exists(portable) ? portable : ServidorAnterior;
+            }
+
+            ModeloPath = Rutas.Resolver(settings.RutaModelo);
+            if (ModeloPath == "")
+            {
+                string carpeta = Path.Combine(Rutas.BaseDir, "modelos");
+                string? portable = Directory.Exists(carpeta)
+                    ? Directory.EnumerateFiles(carpeta, "*.gguf", SearchOption.AllDirectories)
+                        .Where(BuscadorArchivos.EsModeloPrincipal)
+                        .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                        .FirstOrDefault()
+                    : null;
+                ModeloPath = portable ?? ModeloAnterior;
+            }
+        }
 
         private static Process? _proceso;
 
@@ -37,9 +66,14 @@ namespace CitaPDF.Servicios
         {
             if (EstaCorriendo) return true;
 
-            if (!File.Exists(ServidorExe) || !File.Exists(ModeloPath))
+            if (!File.Exists(ServidorExe))
             {
-                log?.Invoke("No se encontró llama-server.exe o el archivo del modelo. Revisá las rutas configuradas.", "ERROR", false);
+                log?.Invoke($"No se encontró llama-server.exe en {ServidorExe}", "ERROR", false);
+                return false;
+            }
+            if (!File.Exists(ModeloPath))
+            {
+                log?.Invoke($"No se encontró el modelo en {ModeloPath}", "ERROR", false);
                 return false;
             }
 
@@ -78,8 +112,6 @@ namespace CitaPDF.Servicios
                 psi.ArgumentList.Add("--flash-attn"); psi.ArgumentList.Add("on");
                 psi.ArgumentList.Add("--cache-type-k"); psi.ArgumentList.Add("q8_0");
                 psi.ArgumentList.Add("--cache-type-v"); psi.ArgumentList.Add("q8_0");
-
-                psi.EnvironmentVariables["PATH"] = VendorPath + ";" + Environment.GetEnvironmentVariable("PATH");
 
                 _ultimasLineasError.Clear();
                 _proceso = new Process { StartInfo = psi, EnableRaisingEvents = true };

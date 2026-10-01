@@ -10,6 +10,10 @@
          selector de carpetas nativo) para "Examinar carpeta". -->
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>CitaPDF</AssemblyName>
+    <!-- Tiene que coincidir con la etiqueta v<Version> de la release:
+         publicar.ps1 lo verifica antes de publicar. -->
+    <Version>1.0.1</Version>
+    <ApplicationIcon>libro.ico</ApplicationIcon>
     <RootNamespace>CitaPDF</RootNamespace>
   </PropertyGroup>
 
@@ -29,6 +33,13 @@
 
   <ItemGroup>
     <Resource Include="assets\rueda.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Sólo al PUBLICAR: crea la carpeta "datos" que activa el modo
+         portable. Nunca en la salida de compilación, para que Debug siga
+         usando Documentos\CitaPDF. -->
+    <None Update="datos\LEEME.txt" CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

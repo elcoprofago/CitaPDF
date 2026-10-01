@@ -1,0 +1,15 @@
+CitaPDF portable
+================
+
+Que exista esta carpeta "datos" junto a CitaPDF.exe activa el modo portable:
+biblioteca.json y config.json se guardan aca y viajan con el programa.
+Si se borra la carpeta, CitaPDF vuelve a usar Documentos\CitaPDF.
+
+La primera vez que el programa corre con esta carpeta vacia, COPIA (no mueve)
+los datos que hubiera en Documentos\CitaPDF de esa PC. Desde ahi, las dos
+bibliotecas son independientes.
+
+Modelo local (opcional, para llevarlo en el pendrive):
+  llama-server\llama-server.exe   (build autonomo de llama.cpp con sus DLL)
+  modelos\<modelo>.gguf
+Si estan ahi se detectan solos. Si no, elegirlos en Configuracion.

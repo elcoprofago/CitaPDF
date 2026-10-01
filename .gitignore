@@ -2,3 +2,9 @@ bin/
 obj/
 .vs/
 *.user
+
+# Repo público: nunca subir datos personales (biblioteca/config) ni
+# respaldos de la biblioteca, estén donde estén.
+datos/*.json
+biblioteca*.json
+config.json

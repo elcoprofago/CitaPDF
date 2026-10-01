@@ -75,11 +75,15 @@ namespace CitaPDF
             InitializeComponent();
             _settings = Biblioteca.CargarSettings();
             _documentos = Biblioteca.CargarDocumentos();
+            LlamaServerProceso.Configurar(_settings);
             ActualizarGrid();
             CargarIconoConfiguracion();
             ActualizarEstadoServidor();
             AplicarTema();
             LlamaServerProceso.PurgarHuerfanos();
+            if (Biblioteca.MensajeArranque != null)
+                Log(Biblioteca.MensajeArranque, Biblioteca.MensajeArranqueEsError ? "ERROR" : "WARN");
+            Log($"Datos en {Biblioteca.GetDataDir()}", "INFO");
             Log("CitaPDF listo.", "OK");
         }
 
@@ -310,6 +314,10 @@ namespace CitaPDF
 
         private bool _procesando;
 
+        // Cambio de servidor/modelo hecho en Configuración durante un lote:
+        // se aplica en el finally del lote (ver AplicarRutasModelo).
+        private bool _rutasModeloPendientes;
+
         private async void BtnAgregarArchivos_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog
@@ -427,6 +435,11 @@ namespace CitaPDF
             finally
             {
                 _procesando = false;
+                if (_rutasModeloPendientes)
+                {
+                    _rutasModeloPendientes = false;
+                    AplicarRutasModelo();
+                }
                 BtnAgregarArchivos.IsEnabled = true;
                 BtnAgregarCarpeta.IsEnabled = true;
                 BtnAgregarUrl.IsEnabled = true;
@@ -604,6 +617,35 @@ namespace CitaPDF
                 Biblioteca.GuardarSettings(_settings);
                 ActualizarGrid();
                 AplicarTema();
+                AplicarRutasModelo();
+            }
+        }
+
+        // Si cambió el servidor o el modelo y el viejo sigue corriendo, se
+        // detiene para que el próximo uso arranque con lo nuevo -- salvo en
+        // medio de un lote, que lo está usando: ahí se aplica al terminar.
+        private void AplicarRutasModelo()
+        {
+            string servidorAntes = LlamaServerProceso.ServidorExe;
+            string modeloAntes = LlamaServerProceso.ModeloPath;
+            if (_procesando && LlamaServerProceso.EstaCorriendo)
+            {
+                Log("El cambio de modelo/servidor se aplica cuando termine el lote y se reinicie el modelo.", "WARN");
+                _rutasModeloPendientes = true;
+                return;
+            }
+            LlamaServerProceso.Configurar(_settings);
+            bool cambio = !string.Equals(servidorAntes, LlamaServerProceso.ServidorExe, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(modeloAntes, LlamaServerProceso.ModeloPath, StringComparison.OrdinalIgnoreCase);
+            if (cambio && LlamaServerProceso.EstaCorriendo)
+            {
+                LlamaServerProceso.Detener();
+                ActualizarEstadoServidor();
+                Log("Modelo local detenido: el próximo inicio usa el servidor/modelo nuevo.", "WARN");
+            }
+            else if (cambio)
+            {
+                Log($"Modelo: {LlamaServerProceso.ModeloPath}", "INFO");
             }
         }
 

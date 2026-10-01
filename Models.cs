@@ -45,5 +45,12 @@ namespace CitaPDF
         // cambio de golpe al actualizar).
         public string Tema { get; set; } = "Claro";
         public string? RutaTextura { get; set; }
+
+        // llama-server.exe y modelo .gguf elegidos en SettingsWindow. Se
+        // guardan con Rutas.ParaGuardar (relativas a la carpeta del .exe si
+        // están adentro, para la versión portable). null = detección
+        // automática, ver LlamaServerProceso.
+        public string? RutaServidor { get; set; }
+        public string? RutaModelo { get; set; }
     }
 }
