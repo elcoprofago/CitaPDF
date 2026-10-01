@@ -9,10 +9,20 @@ namespace CitaPDF
     {
         private readonly AppSettings _settings;
 
-        public SettingsWindow(AppSettings settings)
+        // Con un lote en proceso no se unifica ni se actualiza: el lote está
+        // escribiendo biblioteca.json y usando el modelo.
+        private readonly bool _loteEnCurso;
+
+        // Lo consulta MainWindow al cerrar (aunque se cancele la ventana):
+        // si se unificó, hay que releer la biblioteca.
+        public string? InformeUnificacion { get; private set; }
+
+        public SettingsWindow(AppSettings settings, bool loteEnCurso = false)
         {
             InitializeComponent();
             _settings = settings;
+            _loteEnCurso = loteEnCurso;
+            TxtVersion.Text = $"Versión instalada: {Actualizador.VersionActual}";
             TxtFilasVisibles.Text = _settings.FilasVisiblesEnGrid.ToString();
             TxtCarpetaDatos.Text = Biblioteca.GetDataDir();
 
@@ -134,6 +144,103 @@ namespace CitaPDF
             {
                 MessageBox.Show(this, $"No se pudo guardar la copia:\n{ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private bool AvisarSiLoteEnCurso()
+        {
+            if (!_loteEnCurso) return false;
+            MessageBox.Show(this, "Hay un lote en proceso: esperá a que termine.", "Lote en curso",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return true;
+        }
+
+        private void BtnUnificar_Click(object sender, RoutedEventArgs e)
+        {
+            if (AvisarSiLoteEnCurso()) return;
+            var dlg = new OpenFileDialog
+            {
+                Title = "Elegí la otra biblioteca (no se va a modificar)",
+                Filter = "Biblioteca CitaPDF (*.json)|*.json",
+            };
+            if (dlg.ShowDialog(this) != true) return;
+
+            if (string.Equals(Path.GetFullPath(dlg.FileName), Path.GetFullPath(Biblioteca.GetBibliotecaPath()), StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(this, "Ése es el mismo biblioteca.json que está en uso. Elegí la otra copia.",
+                    "Mismo archivo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            UnificarWindow wnd;
+            try
+            {
+                wnd = new UnificarWindow(dlg.FileName) { Owner = this };
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"No se pudo leer alguna de las dos bibliotecas:\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            if (wnd.ShowDialog() == true) InformeUnificacion = wnd.Informe;
+        }
+
+        private async void BtnActualizar_Click(object sender, RoutedEventArgs e)
+        {
+            if (AvisarSiLoteEnCurso()) return;
+            BtnActualizar.IsEnabled = false;
+            TxtEstadoActualizacion.Visibility = Visibility.Visible;
+            var progreso = new Progress<string>(s => TxtEstadoActualizacion.Text = s);
+            try
+            {
+                TxtEstadoActualizacion.Text = "Consultando GitHub...";
+                var r = await Actualizador.ConsultarUltimaAsync();
+                if (r.Version <= Actualizador.VersionActual)
+                {
+                    TxtEstadoActualizacion.Text = $"Ya tenés la última versión ({Actualizador.VersionActual}).";
+                    return;
+                }
+
+                if (!Actualizador.EsEjecutablePublicado)
+                {
+                    TxtEstadoActualizacion.Text = $"Hay una versión nueva ({r.Version}), pero esta copia corre desde la compilación de Visual Studio: " +
+                                                  $"la actualización automática es sólo para el CitaPDF.exe publicado. Descarga: {r.UrlPagina}";
+                    return;
+                }
+
+                string notas = string.IsNullOrWhiteSpace(r.Notas) ? "" : $"\n\n{r.Notas.Trim()}";
+                var ok = MessageBox.Show(this,
+                    $"Hay una versión nueva: {r.Version} (instalada: {Actualizador.VersionActual}).{notas}\n\n" +
+                    "¿Descargarla e instalarla? CitaPDF se va a reiniciar. La carpeta datos (biblioteca y configuración) no se toca, " +
+                    "y la versión actual queda como CitaPDF.exe.anterior por si hay que volver atrás.\n\n" +
+                    "Lo que no hayas guardado en esta ventana se pierde.",
+                    "Actualizar CitaPDF", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (ok != MessageBoxResult.Yes)
+                {
+                    TxtEstadoActualizacion.Text = $"Versión {r.Version} disponible (no instalada).";
+                    return;
+                }
+
+                string exeNuevo = await Actualizador.DescargarYVerificarAsync(r, progreso);
+                TxtEstadoActualizacion.Text = "Instalando...";
+                string exeActual = Actualizador.ExeActual;
+                Actualizador.Instalar(exeNuevo, exeActual);
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exeActual)
+                {
+                    WorkingDirectory = Path.GetDirectoryName(exeActual)!,
+                    UseShellExecute = false,
+                });
+                Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                TxtEstadoActualizacion.Text = $"No se pudo actualizar: {ex.Message}";
+            }
+            finally
+            {
+                BtnActualizar.IsEnabled = true;
             }
         }
 

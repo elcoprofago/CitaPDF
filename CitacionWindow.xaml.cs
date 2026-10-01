@@ -67,6 +67,7 @@ namespace CitaPDF
                 .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                 .ToList();
 
+            string firmaAntes = Unificador.Firma(_documento);
             _documento.Titulo = TxtTitulo.Text.Trim();
             _documento.AutoresApa = autores;
             _documento.Anio = TxtAnio.Text.Trim();
@@ -74,6 +75,7 @@ namespace CitaPDF
             _documento.OrigenUrl = string.IsNullOrWhiteSpace(TxtUrl.Text) ? null : TxtUrl.Text.Trim();
             _documento.CitaApa = CitaApa.Construir(autores, _documento.Anio, _documento.Titulo, _documento.Editorial, _documento.OrigenUrl);
             _documento.ExtraidoAutomaticamente = false;
+            if (Unificador.Firma(_documento) != firmaAntes) _documento.FechaModificacion = DateTime.Now;
 
             TxtCita.Text = _documento.CitaApa;
             TxtAviso.Visibility = Visibility.Collapsed;

@@ -13,3 +13,14 @@ Modelo local (opcional, para llevarlo en el pendrive):
   llama-server\llama-server.exe   (build autonomo de llama.cpp con sus DLL)
   modelos\<modelo>.gguf
 Si estan ahi se detectan solos. Si no, elegirlos en Configuracion.
+
+Unificar con otra copia (Configuracion > Unificar con otra...):
+suma el contenido de otra biblioteca.json a esta. Agrega lo que falta,
+completa campos vacios y pregunta solo cuando el mismo dato difiere.
+Antes de guardar deja un respaldo en datos\respaldos.
+
+Actualizar (Configuracion > Buscar actualizacion):
+descarga la ultima version publicada y reemplaza CitaPDF.exe. La carpeta
+datos no se toca. La version anterior queda como CitaPDF.exe.anterior:
+para volver atras, cerrar CitaPDF, borrar CitaPDF.exe y renombrar
+CitaPDF.exe.anterior a CitaPDF.exe.

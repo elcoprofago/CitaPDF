@@ -81,10 +81,11 @@ namespace CitaPDF
             ActualizarEstadoServidor();
             AplicarTema();
             LlamaServerProceso.PurgarHuerfanos();
+            Actualizador.LimpiarRestos();
             if (Biblioteca.MensajeArranque != null)
                 Log(Biblioteca.MensajeArranque, Biblioteca.MensajeArranqueEsError ? "ERROR" : "WARN");
             Log($"Datos en {Biblioteca.GetDataDir()}", "INFO");
-            Log("CitaPDF listo.", "OK");
+            Log($"CitaPDF {Actualizador.VersionActual} listo.", "OK");
         }
 
         // ===================== Tema (misma lógica que CONSULTOR-GUI) =====================
@@ -538,6 +539,7 @@ namespace CitaPDF
                 DocumentoId = Biblioteca.GenerarNuevoId(_documentos),
                 HashSha256 = hash,
                 FechaAdquisicion = DateTime.Now,
+                FechaModificacion = DateTime.Now,
                 OrigenUrl = url,
                 RutaArchivoOriginal = rutaLocal,
             };
@@ -611,8 +613,19 @@ namespace CitaPDF
 
         private void BtnConfiguracion_Click(object sender, RoutedEventArgs e)
         {
-            var wnd = new SettingsWindow(_settings) { Owner = this };
-            if (wnd.ShowDialog() == true)
+            var wnd = new SettingsWindow(_settings, _procesando) { Owner = this };
+            bool guardado = wnd.ShowDialog() == true;
+
+            // La unificación ya quedó guardada aunque después se cancele
+            // Configuración.
+            if (wnd.InformeUnificacion != null)
+            {
+                _documentos = Biblioteca.CargarDocumentos();
+                Log(wnd.InformeUnificacion, "OK");
+                ActualizarGrid();
+            }
+
+            if (guardado)
             {
                 Biblioteca.GuardarSettings(_settings);
                 ActualizarGrid();

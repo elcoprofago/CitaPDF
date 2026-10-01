@@ -127,6 +127,7 @@ namespace CitaPDF
             // exacto no está garantizado) -- se lee directo del control.
             string valor = caja.Text;
             string header = e.Column.Header?.ToString() ?? "";
+            string firmaAntes = Unificador.Firma(fila.Documento);
             switch (header)
             {
                 case "Título": fila.Titulo = valor; break;
@@ -142,6 +143,7 @@ namespace CitaPDF
             // completarse después, así que no debe marcar la cita como
             // "para revisar".
             if (header != "URL") fila.Documento.ExtraidoAutomaticamente = false;
+            if (Unificador.Firma(fila.Documento) != firmaAntes) fila.Documento.FechaModificacion = DateTime.Now;
 
             fila.Documento.CitaApa = CitaApa.Construir(
                 fila.Documento.AutoresApa, fila.Documento.Anio, fila.Documento.Titulo,

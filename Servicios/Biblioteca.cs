@@ -177,6 +177,60 @@ namespace CitaPDF.Servicios
             return archivo?.Documentos.Count ?? 0;
         }
 
+        // Lectura para unificar: a diferencia de CargarDocumentos, un archivo
+        // ilegible LANZA en vez de devolver una lista vacía -- unificar contra
+        // "vacío" agregaría todo lo de la otra copia y guardaría encima del
+        // archivo dañado como si fuera una biblioteca nueva.
+        public static List<DocumentoRecord> LeerParaUnificar(string ruta)
+        {
+            string json = File.ReadAllText(ruta, Encoding.UTF8);
+            BibliotecaFile? archivo;
+            bool tieneDocumentos;
+            try
+            {
+                // BibliotecaFile inicializa Documentos vacío: sin mirar el
+                // JSON, cualquier otro .json (config.json, p. ej.) pasaría por
+                // una biblioteca vacía.
+                using (var doc = JsonDocument.Parse(json))
+                    tieneDocumentos = doc.RootElement.ValueKind == JsonValueKind.Object &&
+                        doc.RootElement.EnumerateObject().Any(p =>
+                            p.Name.Equals("Documentos", StringComparison.OrdinalIgnoreCase) && p.Value.ValueKind == JsonValueKind.Array);
+                archivo = JsonSerializer.Deserialize<BibliotecaFile>(json, JsonOptsLectura);
+            }
+            catch (JsonException ex) { throw new InvalidDataException($"{ruta} no es una biblioteca válida: {ex.Message}"); }
+            if (!tieneDocumentos || archivo == null)
+                throw new InvalidDataException($"{ruta} no es una biblioteca de CitaPDF (no tiene \"Documentos\").");
+            return archivo.Documentos;
+        }
+
+        // Copia verificada de biblioteca.json en datos\respaldos antes de una
+        // operación que la reescribe entera (unificar). Devuelve la ruta, o
+        // null si todavía no había biblioteca.json que respaldar.
+        public static string? Respaldar(string motivo)
+        {
+            string origen = GetBibliotecaPath();
+            if (!File.Exists(origen)) return null;
+            string dir = Path.Combine(GetDataDir(), "respaldos");
+            Directory.CreateDirectory(dir);
+            string destino = Path.Combine(dir, $"biblioteca-{motivo}-{DateTime.Now:yyyy-MM-dd_HHmmss}.json");
+            byte[] contenido = File.ReadAllBytes(origen);
+            File.WriteAllBytes(destino + ".tmp", contenido);
+            File.Move(destino + ".tmp", destino, overwrite: false);
+            if (!contenido.AsSpan().SequenceEqual(File.ReadAllBytes(destino)))
+                throw new IOException("El respaldo no coincide con el original.");
+            return destino;
+        }
+
+        // Guarda y relee: lanza si lo que quedó en disco no es lo esperado.
+        public static void GuardarDocumentosVerificado(List<DocumentoRecord> documentos)
+        {
+            GuardarDocumentos(documentos);
+            var releidos = LeerParaUnificar(GetBibliotecaPath());
+            if (releidos.Count != documentos.Count ||
+                !releidos.Select(d => d.DocumentoId).SequenceEqual(documentos.Select(d => d.DocumentoId)))
+                throw new IOException("biblioteca.json no quedó con los documentos esperados.");
+        }
+
         // Escritura vía archivo temporal + File.Move: si la app se cierra a
         // mitad de una escritura, biblioteca.json nunca queda truncado --
         // en el peor caso queda un .tmp huérfano, nunca datos corruptos.

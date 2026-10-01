@@ -13,6 +13,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal">
@@ -25,6 +26,9 @@
         <StackPanel Grid.Row="1" Margin="0,16,0,0">
             <TextBlock Text="Carpeta de datos (config.json / biblioteca.json):" FontWeight="Bold"/>
             <DockPanel Margin="0,4,0,0">
+                <Button x:Name="BtnUnificar" DockPanel.Dock="Right" Content="Unificar con otra..." Padding="10,4"
+                        Margin="6,0,0,0" Click="BtnUnificar_Click"
+                        ToolTip="Suma a esta biblioteca lo que tenga otra copia (de otra PC, pendrive, respaldo...)"/>
                 <Button x:Name="BtnGuardarCopia" DockPanel.Dock="Right" Content="Guardar copia..." Padding="10,4"
                         Margin="8,0,0,0" Click="BtnGuardarCopia_Click"
                         ToolTip="Guarda una copia de biblioteca.json en la ubicación que elijas"/>
@@ -75,7 +79,19 @@
                        TextWrapping="Wrap"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+        <StackPanel Grid.Row="4" Margin="0,16,0,0">
+            <TextBlock Text="Aplicación:" FontWeight="Bold"/>
+            <DockPanel Margin="0,4,0,0">
+                <Button x:Name="BtnActualizar" DockPanel.Dock="Right" Content="Buscar actualización" Padding="10,4"
+                        Margin="8,0,0,0" Click="BtnActualizar_Click"
+                        ToolTip="Consulta la última versión publicada en GitHub e instala el nuevo CitaPDF.exe (no toca la carpeta datos)"/>
+                <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"/>
+            </DockPanel>
+            <TextBlock x:Name="TxtEstadoActualizacion" Margin="0,4,0,0" Foreground="Gray" FontStyle="Italic"
+                       TextWrapping="Wrap" Visibility="Collapsed"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Name="BtnGuardar" Content="Guardar" Padding="10,6" Click="BtnGuardar_Click" IsDefault="True"/>
             <Button x:Name="BtnCancelar" Content="Cancelar" Padding="10,6" Margin="8,0,0,0" Click="BtnCancelar_Click" IsCancel="True"/>
         </StackPanel>

@@ -22,6 +22,11 @@ namespace CitaPDF
         // false cuando el pipeline automático no pudo completar algo y el
         // usuario tuvo que corregir/completar campos a mano.
         public bool ExtraidoAutomaticamente { get; set; }
+
+        // Última vez que cambió algún dato del registro (alta, corrección o
+        // unificación). Lo usa Unificador para sugerir qué versión conservar
+        // en un conflicto. null en registros anteriores a la 1.0.2.
+        public DateTime? FechaModificacion { get; set; }
     }
 
     public class BibliotecaFile
