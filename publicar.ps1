@@ -106,8 +106,15 @@ git push origin master $etiqueta
 if ($LASTEXITCODE -ne 0) { Fallar "git push falló (la etiqueta $etiqueta quedó solo local: 'git tag -d $etiqueta' para reintentar)." }
 
 Paso "Release en GitHub"
-gh release create $etiqueta $zip --title "CitaPDF $version" --notes $Notas
-if ($LASTEXITCODE -ne 0) { Fallar "gh release create falló (la etiqueta ya está en GitHub; reintentar solo este paso)." }
+# Las notas van por archivo: PowerShell 5.1 no escapa las comillas internas
+# al pasar un argumento a un programa nativo, y unas notas con "..." llegan a
+# gh partidas en varios argumentos (pasó con la 1.0.2).
+$archivoNotas = Join-Path $env:TEMP "CitaPDF-notas-$etiqueta.md"
+[IO.File]::WriteAllText($archivoNotas, $Notas, (New-Object Text.UTF8Encoding $false))
+gh release create $etiqueta $zip --title "CitaPDF $version" --notes-file $archivoNotas
+$codigoGh = $LASTEXITCODE
+Remove-Item $archivoNotas -ErrorAction SilentlyContinue
+if ($codigoGh -ne 0) { Fallar "gh release create falló (la etiqueta ya está en GitHub; reintentar solo este paso)." }
 
 $assets = gh release view $etiqueta --json assets --jq '.assets[].name'
 if ($LASTEXITCODE -ne 0 -or $assets -notcontains (Split-Path $zip -Leaf)) { Fallar "La release se creó pero no se verificó el zip adjunto." }
