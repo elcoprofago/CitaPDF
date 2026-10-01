@@ -76,7 +76,15 @@ if ($sueltos) { Fallar "Archivos inesperados en la publicación: $($sueltos.Name
 
 Paso "Armando $zip"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[IO.Compression.ZipFile]::CreateFromDirectory($staging, $zip, [IO.Compression.CompressionLevel]::Optimal, $true)
+# Entrada por entrada: CreateFromDirectory de .NET Framework (PowerShell 5.1)
+# graba las rutas con "\", que otros descompresores no toman como carpeta.
+$archivo = [IO.Compression.ZipFile]::Open($zip, 'Create')
+try {
+    foreach ($f in Get-ChildItem $staging -Recurse -File) {
+        $nombre = 'CitaPDF/' + $f.FullName.Substring($staging.Length + 1).Replace('\', '/')
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archivo, $f.FullName, $nombre, 'Optimal')
+    }
+} finally { $archivo.Dispose() }
 $entradas = [IO.Compression.ZipFile]::OpenRead($zip)
 try { $nombres = @($entradas.Entries | ForEach-Object { $_.FullName }) } finally { $entradas.Dispose() }
 if ($nombres -match '\.json$') { Fallar "El zip contiene un .json (¿datos personales?): $($nombres -join ', ')" }
