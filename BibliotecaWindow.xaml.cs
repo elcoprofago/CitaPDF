@@ -155,38 +155,18 @@ namespace CitaPDF
 
         // Reemplaza la columna "Adquirido" (tampoco resultaba de utilidad)
         // por un enlace directo al documento -- mismo criterio de apertura
-        // que CitacionWindow / MainWindow.
+        // que CitacionWindow / MainWindow. Si el PDF cambió de lugar, ofrece
+        // ubicarlo (UbicarPdfWindow).
         private void LinkAbrirDocumento_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Hyperlink link || link.DataContext is not BibliotecaRow fila) return;
-            var documento = fila.Documento;
+            UbicarPdfWindow.AbrirDocumento(this, fila.Documento, _todos, () => true);
+        }
 
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(documento.OrigenUrl))
-                {
-                    Process.Start(new ProcessStartInfo(documento.OrigenUrl) { UseShellExecute = true });
-                }
-                else if (!string.IsNullOrWhiteSpace(documento.RutaArchivoOriginal))
-                {
-                    if (!File.Exists(documento.RutaArchivoOriginal))
-                    {
-                        MessageBox.Show(this, "No se encontró el archivo en la ruta guardada:\n" + documento.RutaArchivoOriginal,
-                            "Archivo no disponible", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-                    Process.Start(new ProcessStartInfo(documento.RutaArchivoOriginal) { UseShellExecute = true });
-                }
-                else
-                {
-                    MessageBox.Show(this, "Este documento no tiene una ruta local ni una URL de origen guardada.",
-                        "Sin origen", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "No se pudo abrir: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+        private void MenuUbicarPdf_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridBiblioteca.SelectedItem is not BibliotecaRow fila) return;
+            new UbicarPdfWindow(fila.Documento, _todos) { Owner = this }.ShowDialog();
         }
 
         // El clic derecho no mueve la selección por defecto en un DataGrid

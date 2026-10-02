@@ -104,27 +104,14 @@ namespace CitaPDF
 
         private void BtnAbrir_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(_documento.OrigenUrl))
-                {
-                    Process.Start(new ProcessStartInfo(_documento.OrigenUrl) { UseShellExecute = true });
-                }
-                else if (!string.IsNullOrWhiteSpace(_documento.RutaArchivoOriginal))
-                {
-                    if (!File.Exists(_documento.RutaArchivoOriginal))
-                    {
-                        MessageBox.Show(this, "No se encontró el archivo en la ruta guardada:\n" + _documento.RutaArchivoOriginal,
-                            "Archivo no disponible", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-                    Process.Start(new ProcessStartInfo(_documento.RutaArchivoOriginal) { UseShellExecute = true });
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "No se pudo abrir: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            // Misma lista que guarda BtnReconstruir: la del disco, con este
+            // registro en lugar del suyo, para que una ruta corregida acá se
+            // guarde sobre el mismo objeto que muestra la ventana.
+            var documentos = Biblioteca.CargarDocumentos();
+            int idx = documentos.FindIndex(d => d.DocumentoId == _documento.DocumentoId);
+            if (idx >= 0) documentos[idx] = _documento;
+            else documentos.Add(_documento);
+            UbicarPdfWindow.AbrirDocumento(this, _documento, documentos, () => true);
         }
 
         private void BtnCerrar_Click(object sender, RoutedEventArgs e)

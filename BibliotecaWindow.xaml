@@ -37,6 +37,7 @@
                 <ContextMenu>
                     <MenuItem Header="Copiar cita APA" Click="MenuCopiarCita_Click"/>
                     <MenuItem Header="Copiar fila completa" Click="MenuCopiarFila_Click"/>
+                    <MenuItem Header="Ubicar PDF..." Click="MenuUbicarPdf_Click"/>
                     <Separator/>
                     <MenuItem Header="Borrar registro" Click="MenuBorrarRegistro_Click"/>
                 </ContextMenu>

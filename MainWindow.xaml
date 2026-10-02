@@ -161,6 +161,8 @@
             </DataGrid.RowStyle>
             <DataGrid.ContextMenu>
                 <ContextMenu>
+                    <MenuItem Header="Ubicar PDF..." Click="MenuUbicarPdf_Click"/>
+                    <Separator/>
                     <MenuItem Header="Borrar registro" Click="MenuBorrarRegistro_Click"/>
                 </ContextMenu>
             </DataGrid.ContextMenu>
