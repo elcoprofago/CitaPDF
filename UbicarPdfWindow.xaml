@@ -5,10 +5,13 @@
         WindowStartupLocation="CenterOwner" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown">
     <StackPanel Margin="14">
         <TextBlock x:Name="TxtMensaje" TextWrapping="Wrap" Margin="0,0,0,8"/>
-        <TextBox x:Name="TxtRuta" IsReadOnly="True" TextWrapping="Wrap" Foreground="Gray"
-                 BorderThickness="0" Background="Transparent" Margin="0,0,0,10"/>
+        <DockPanel Margin="0,0,0,10">
+            <Button x:Name="BtnUsarRuta" DockPanel.Dock="Right" Content="Usar esta ruta" Padding="10,4"
+                    Margin="8,0,0,0" VerticalAlignment="Top" Click="BtnUsarRuta_Click"/>
+            <TextBox x:Name="TxtRuta" TextWrapping="Wrap" Padding="2,3" KeyDown="TxtRuta_KeyDown"/>
+        </DockPanel>
         <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,10"
-                   Text="El PDF se reconoce por su contenido, no por el nombre: se encuentra aunque lo hayas renombrado. Al buscar en una carpeta también se revisan sus subcarpetas, y se aprovecha para encontrar los demás PDFs de la biblioteca que falten."/>
+                   Text="Podés corregir la ruta a mano (por ejemplo, si cambió la letra de la unidad). El PDF también se reconoce por su contenido, no por el nombre: al buscar en una carpeta se encuentra aunque lo hayas renombrado, se revisan sus subcarpetas, y se aprovecha para encontrar los demás PDFs de la biblioteca que falten."/>
         <TextBlock x:Name="TxtProgreso" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="BtnElegir" Content="Elegir el archivo..." Padding="10,6" Click="BtnElegir_Click"/>

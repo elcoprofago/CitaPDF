@@ -29,7 +29,7 @@ namespace CitaPDF
                 TxtMensaje.Text = $"{titulo} no tiene un PDF local asociado. Podés indicar dónde está:";
             else
                 TxtMensaje.Text = $"Ubicación actual del PDF de {titulo}:";
-            TxtRuta.Text = string.IsNullOrWhiteSpace(doc.RutaArchivoOriginal) ? "(sin ruta guardada)" : doc.RutaArchivoOriginal;
+            TxtRuta.Text = doc.RutaArchivoOriginal ?? "";
 
             if (string.IsNullOrWhiteSpace(doc.HashSha256))
             {
@@ -77,8 +77,39 @@ namespace CitaPDF
                 InitialDirectory = Ubicador.CarpetaExistenteMasCercana(_doc.RutaArchivoOriginal) ?? "",
             };
             if (dlg.ShowDialog(this) != true) return;
-            string ruta = dlg.FileName;
+            Asociar(dlg.FileName);
+        }
 
+        // Ruta corregida a mano: muchas veces alcanza con cambiar la letra de
+        // la unidad. Las comillas se quitan porque "Copiar como ruta" del
+        // Explorador las agrega.
+        private void BtnUsarRuta_Click(object sender, RoutedEventArgs e)
+        {
+            string ruta = TxtRuta.Text.Trim().Trim('"').Trim();
+            if (ruta.Length == 0)
+            {
+                MessageBox.Show(this, "Escribí la ruta del PDF.", "Ubicar PDF", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (!File.Exists(ruta))
+            {
+                MessageBox.Show(this, $"No existe el archivo:\n{ruta}", "Ubicar PDF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            Asociar(Path.GetFullPath(ruta));
+        }
+
+        private void TxtRuta_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Enter) return;
+            e.Handled = true;
+            BtnUsarRuta_Click(sender, e);
+        }
+
+        // Asocia 'ruta' al documento comprobando antes su contenido contra la
+        // huella catalogada (común a elegir el archivo y escribir la ruta).
+        private void Asociar(string ruta)
+        {
             string hash;
             try { hash = Ubicador.CalcularHash(ruta); }
             catch (Exception ex)
@@ -96,6 +127,13 @@ namespace CitaPDF
                 {
                     MessageBox.Show(this, $"Ese PDF ya está catalogado como {otro.DocumentoId} ({otro.Titulo}). Elegí el archivo de este documento.",
                         "Ubicar PDF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                // Sin huella catalogada no hay contra qué comparar: se adopta
+                // la de este archivo sin preguntar.
+                if (string.IsNullOrWhiteSpace(_doc.HashSha256))
+                {
+                    if (Guardar(new[] { (_doc, ruta, (string?)hash) })) DialogResult = true;
                     return;
                 }
                 var r = MessageBox.Show(this,
@@ -219,6 +257,8 @@ namespace CitaPDF
         private void EnBusqueda(bool buscando)
         {
             BtnElegir.IsEnabled = !buscando;
+            BtnUsarRuta.IsEnabled = !buscando;
+            TxtRuta.IsReadOnly = buscando;
             BtnBuscar.IsEnabled = !buscando && !string.IsNullOrWhiteSpace(_doc.HashSha256);
             BtnCancelar.Content = buscando ? "Detener búsqueda" : "Cancelar";
             TxtProgreso.Visibility = Visibility.Visible;
