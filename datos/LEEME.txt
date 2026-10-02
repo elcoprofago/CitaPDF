@@ -24,3 +24,8 @@ descarga la ultima version publicada y reemplaza CitaPDF.exe. La carpeta
 datos no se toca. La version anterior queda como CitaPDF.exe.anterior:
 para volver atras, cerrar CitaPDF, borrar CitaPDF.exe y renombrar
 CitaPDF.exe.anterior a CitaPDF.exe.
+
+PDF movido o renombrado (enlace Abrir, o clic derecho > Ubicar PDF...):
+si el PDF ya no esta donde se catalogo, se lo puede elegir o buscar en una
+carpeta. La busqueda lo reconoce por su contenido aunque tenga otro nombre,
+y ofrece corregir tambien los demas que falten y aparezcan ahi.
